@@ -25,8 +25,8 @@ $$\dot{\theta}=\frac{v\sin{\delta}}{L}$$
 
 ![Center of gravity model](./Bicycle%20Kinematic%20Model%20Center%20of%20the%20Gravity.jpg)
 
-$$\dot{x}_f=v\cos{(\theta+\beta)}$$
-$$\dot{y}_f=v\sin{(\theta+\beta)}$$
+$$\dot{x}_c=v\cos{(\theta+\beta)}$$
+$$\dot{y}_c=v\sin{(\theta+\beta)}$$
 $$\dot{\theta}=\frac{v\cos{\beta}\tan{\delta}}{L}$$
 $$\beta = \tan^{-1}(\frac{l_r\tan\delta}{L})$$
 
