@@ -33,3 +33,7 @@ Throttle input is calculated such that the vehicle track the desired acceleratio
   * The tire slip is small (gentle longitudinal maneuvers)
 
 $$T_{engine} = \frac{J_e}{(r_{eff}(GR))}\ddot{x}_{des} + T_{Load}$$
+
+## Additional Material
+
+R. Rajamani, "Introduction to Longitudinal Control " In: Vehicle Dynamics and Control, Mechanical Engineering Series
