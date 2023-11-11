@@ -32,3 +32,7 @@ Actuators (throttle angle):
 ## Feedforward Table
 
 ![Feedforward Table](./Feedforward%20Table.jpg)
+
+## Additional resources
+
+Sailan, K., Kuhnert, K.D., ["Modeling and Design of Cruise Control System with Feedforward For All Terrain Vehicles"](https://airccj.org/CSCP/vol3/csit3828.pdf), Computer Science & Information Technology (CS & IT). 2013.
