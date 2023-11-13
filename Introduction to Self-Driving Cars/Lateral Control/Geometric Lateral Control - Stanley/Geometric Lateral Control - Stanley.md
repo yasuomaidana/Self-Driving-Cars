@@ -65,3 +65,9 @@ Steer into constant radius curves
 
 * Improves tracking on curves by adding a feedforward term on
 heading
+
+## Additional resources
+
+Snider, J. M., ["Automatic Steering Methods for Autonomous Automobile Path Tracking"](https://www.ri.cmu.edu/pub_files/2009/2/Automatic_Steering_Methods_for_Autonomous_Automobile_Path_Tracking.pdf), Robotics Institute, Carnegie Mellon University, Pittsburg (February 2009).
+
+Hoffmann, G. et al., ["Autonomous Automobile Trajectory Tracking for Off-Road Driving: Controller Design, Experimental Validation and Racing"](http://ai.stanford.edu/~gabeh/papers/hoffmann_stanley_control07.pdf), Stanford University, (2007).
