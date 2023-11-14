@@ -1,12 +1,12 @@
-# Intrductin t Lateral Vehicle Cntrl
+# Introduction to Lateral Vehicle Control
 
-## Lateral Cntrl Design
+## Lateral Control Design
 
-Lateral cntrl fr an autmbile
+Lateral control for an automobile
 
-* Define errr relative t desired path
-* Select a cntrl law that drives errrs t zer and satisfies input cnstraints
-* Add dynamic cnsideratins t manage frces and mments acting n vehicle
+* Define error relative to desired path
+* Select a control law that drives errors to zero and satisfies input cnstraints
+* Add dynamic considerations to manage forces and moments acting on vehicle
 
 ## The reference path
 
@@ -14,7 +14,7 @@ Lateral cntrl fr an autmbile
 Track:
 
 * Straight line segments
-* Waypints
+* Waypoints
 * Parameterized curves
 
 Main goals:
