@@ -8,6 +8,21 @@ import cutils
 import numpy as np
 
 
+class PIDController:
+    def __init__(self, kp: float, kd: float, ki: float):
+        self.kp = kp
+        self.kd = kd
+        self.ki = ki
+        self.integrated_error = 0
+        self.previous_val = 0
+
+    def control(self, ref, val, time_step) -> float:
+        error = ref - val
+        derivate = (val - self.previous_val) / time_step
+        self.integrated_error += error * time_step
+        return error * self.kp + derivate * self.kd + self.integrated_error * self.ki
+
+
 class Controller2D(object):
     def __init__(self, waypoints):
         self.vars = cutils.CUtils()
@@ -26,6 +41,11 @@ class Controller2D(object):
         self._conv_rad_to_steer = 180.0 / 70.0 / np.pi
         self._pi = np.pi
         self._2pi = 2.0 * np.pi
+
+        kp = 3
+        kd = 0.5
+        ki = 0.1
+        self.v_controller = PIDController(kp, kd, ki)
 
     def update_values(self, x, y, yaw, speed, timestamp, frame):
         self._current_x = x
@@ -66,7 +86,7 @@ class Controller2D(object):
         self._set_throttle = throttle
 
     def set_steer(self, input_steer_in_rad):
-        # Covnert radians to [-1, 1]
+        # Convert radians to [-1, 1]
         input_steer = self._conv_rad_to_steer * input_steer_in_rad
 
         # Clamp the steering command to valid bounds
@@ -115,6 +135,9 @@ class Controller2D(object):
             throttle_output = 0.5 * self.vars.v_previous
         """
         self.vars.create_var('v_previous', 0.0)
+        self.vars.create_var('t_previous', 0.0)
+        self.vars.create_var('throttle_previous', 0.0)
+        self.vars.create_var('a_max', 1)
 
         # Skip the first frame to store previous values properly
         if self._start_control_loop:
@@ -161,12 +184,23 @@ class Controller2D(object):
                 example, can treat self.vars.v_previous like a "global variable".
             """
 
+            delta_t = t - self.vars.t_previous
+
+            acc = self.v_controller.control(v_desired, v, delta_t)
+
+            self.vars.a_max = max(self.vars.a_max, abs(v - self.vars.v_previous)/delta_t)
+
+            normalized_acc = acc/self.vars.a_max if abs(acc)/self.vars.a_max < 1 else acc/abs(acc)
+
             # Change these outputs with the longitudinal controller. Note that
             # brake_output is optional and is not required to pass the
             # assignment, as the car will naturally slow down over time.
-            throttle_output = 0
-            brake_output = 0
-
+            if normalized_acc > 0:
+                throttle_output = normalized_acc
+                brake_output = 0
+            else:
+                throttle_output = 0
+                brake_output = normalized_acc
             ######################################################
             ######################################################
             # MODULE 7: IMPLEMENTATION OF LATERAL CONTROLLER HERE
@@ -199,3 +233,4 @@ class Controller2D(object):
             in the next iteration)
         """
         self.vars.v_previous = v  # Store forward speed to be used in next step
+        self.vars.t_previous = t
