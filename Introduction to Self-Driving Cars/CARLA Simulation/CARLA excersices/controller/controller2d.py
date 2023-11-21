@@ -42,9 +42,16 @@ class Controller2D(object):
         self._pi = np.pi
         self._2pi = 2.0 * np.pi
 
-        kp = 3
-        kd = 0.5
-        ki = 0.1
+        # kp = 3
+        # kd = 0.1
+        # ki = 1
+        # kp = 4
+        # kd = 0.15
+        # ki = 1.55
+        kp = 2.5
+        ki = kp/2
+        kd = ki/20
+
         self.v_controller = PIDController(kp, kd, ki)
 
     def update_values(self, x, y, yaw, speed, timestamp, frame):
@@ -188,19 +195,16 @@ class Controller2D(object):
 
             acc = self.v_controller.control(v_desired, v, delta_t)
 
-            self.vars.a_max = max(self.vars.a_max, abs(v - self.vars.v_previous)/delta_t)
+            self.vars.a_max = max(self.vars.a_max, abs(v - self.vars.v_previous) / delta_t)
 
-            normalized_acc = acc/self.vars.a_max if abs(acc)/self.vars.a_max < 1 else acc/abs(acc)
+            normalized_acc = acc / self.vars.a_max if abs(acc) / self.vars.a_max < 1 else acc / abs(acc)
 
             # Change these outputs with the longitudinal controller. Note that
             # brake_output is optional and is not required to pass the
             # assignment, as the car will naturally slow down over time.
-            if normalized_acc > 0:
-                throttle_output = normalized_acc
-                brake_output = 0
-            else:
-                throttle_output = 0
-                brake_output = normalized_acc
+
+            throttle_output = 0 if normalized_acc < 0 else normalized_acc
+            brake_output = 0 if acc > -2 else np.exp(acc)
             ######################################################
             ######################################################
             # MODULE 7: IMPLEMENTATION OF LATERAL CONTROLLER HERE
