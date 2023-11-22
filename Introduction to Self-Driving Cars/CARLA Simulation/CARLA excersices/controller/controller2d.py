@@ -3,24 +3,46 @@
 """
 2D Controller Class to be used for the CARLA waypoint follower demo.
 """
+from typing import Callable
 
 import cutils
 import numpy as np
 
 
 class PIDController:
-    def __init__(self, kp: float, kd: float, ki: float):
+    def __init__(self, kp: float, kd: float, ki: float, soft_starter: Callable[[float], float] = lambda x: 1.0):
         self.kp = kp
         self.kd = kd
         self.ki = ki
         self.integrated_error = 0
-        self.previous_val = 0
+        self.previous_error = 0
+        self.soft_start = 0.0
+        self.soft_starter = soft_starter
+        self.over_fix = 0.0
 
     def control(self, ref, val, time_step) -> float:
         error = ref - val
-        derivate = (val - self.previous_val) / time_step
+        derivate = (error - self.previous_error) / time_step * self.kd
+        proportional = error * self.kp
+        integral = self.integrated_error * self.ki
+        if np.isclose(derivate, 0, rtol=1e-3):
+            derivate = 0
+
+        if self.soft_start < 1:
+            soft_starter = self.soft_starter(self.soft_start)
+            self.soft_start += 0.07 + 0.1 * (1 - np.exp((error - 2) / 4) / (1 + np.exp((error - 2) / 4)))
+            proportional *= soft_starter
+            derivate *= soft_starter
+            integral *= soft_starter
+
+        if error > 0 and self.over_fix > 0:
+            self.over_fix -= 0.01
+        else:
+            self.over_fix += 0.01
+
         self.integrated_error += error * time_step
-        return error * self.kp + derivate * self.kd + self.integrated_error * self.ki
+        self.previous_error = error
+        return proportional + derivate + integral * (1 if error > 0 else np.exp(-self.over_fix**2))
 
 
 class Controller2D(object):
@@ -42,17 +64,12 @@ class Controller2D(object):
         self._pi = np.pi
         self._2pi = 2.0 * np.pi
 
-        # kp = 3
-        # kd = 0.1
-        # ki = 1
-        # kp = 4
-        # kd = 0.15
-        # ki = 1.55
-        kp = 2.5
-        ki = kp/2
-        kd = ki/20
+        kp = 2.25
+        ki = 1.75
+        kd = .35
 
-        self.v_controller = PIDController(kp, kd, ki)
+        self.v_controller = PIDController(kp, kd, ki,
+                                          lambda x: 1.1 - np.exp(-5 * (x - 0.5)) / (1 + np.exp(-5 * (x - 0.5))))
 
     def update_values(self, x, y, yaw, speed, timestamp, frame):
         self._current_x = x
@@ -143,8 +160,7 @@ class Controller2D(object):
         """
         self.vars.create_var('v_previous', 0.0)
         self.vars.create_var('t_previous', 0.0)
-        self.vars.create_var('throttle_previous', 0.0)
-        self.vars.create_var('a_max', 1)
+        self.vars.create_var('a_max', 2)
 
         # Skip the first frame to store previous values properly
         if self._start_control_loop:
@@ -194,17 +210,15 @@ class Controller2D(object):
             delta_t = t - self.vars.t_previous
 
             acc = self.v_controller.control(v_desired, v, delta_t)
-
             self.vars.a_max = max(self.vars.a_max, abs(v - self.vars.v_previous) / delta_t)
-
-            normalized_acc = acc / self.vars.a_max if abs(acc) / self.vars.a_max < 1 else acc / abs(acc)
 
             # Change these outputs with the longitudinal controller. Note that
             # brake_output is optional and is not required to pass the
             # assignment, as the car will naturally slow down over time.
 
-            throttle_output = 0 if normalized_acc < 0 else normalized_acc
-            brake_output = 0 if acc > -2 else np.exp(acc)
+            throttle_output = acc / self.vars.a_max
+
+            brake_output = 0 if acc > 0 else acc / self.vars.a_max
             ######################################################
             ######################################################
             # MODULE 7: IMPLEMENTATION OF LATERAL CONTROLLER HERE
