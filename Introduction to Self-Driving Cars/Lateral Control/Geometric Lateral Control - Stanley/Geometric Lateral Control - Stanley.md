@@ -19,7 +19,7 @@ Stanley method is the path tracking approach used by Stanford University's Darpa
   * Inversely proportional to speed
   * Limit effect for large errors with inverse tan
   * Gain k determined experimentally
-  $$\delta(t) = \tan^-1\left(\frac{ke(t)}{v_f(t)} \right)$$
+  $$\delta(t) = \tan^{-1}\left(\frac{ke(t)}{v_f(t)} \right)$$
 * Maximum and minimum steering angles $$\delta(t) \in [\delta_{min},\delta_{max}]$$
 
 ## Combined steering law
