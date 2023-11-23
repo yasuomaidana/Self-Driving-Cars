@@ -42,7 +42,7 @@ class PIDController:
 
         self.integrated_error += error * time_step
         self.previous_error = error
-        return proportional + derivate + integral * (1 if error > 0 else np.exp(-self.over_fix**2))
+        return proportional + derivate + integral * (1 if error > 0 else np.exp(-self.over_fix ** 2))
 
 
 class Controller2D(object):
@@ -84,7 +84,6 @@ class Controller2D(object):
     def update_desired_speed(self):
         min_idx = 0
         min_dist = float("inf")
-        desired_speed = 0
         for i in range(len(self._waypoints)):
             dist = np.linalg.norm(np.array([
                 self._waypoints[i][0] - self._current_x,
@@ -134,9 +133,6 @@ class Controller2D(object):
         v_desired = self._desired_speed
         t = self._current_timestamp
         waypoints = self._waypoints
-        throttle_output = 0
-        steer_output = 0
-        brake_output = 0
 
         ######################################################
         ######################################################
@@ -232,6 +228,50 @@ class Controller2D(object):
 
             # Change the steer output with the lateral controller. 
             steer_output = 0
+
+            # Use stanley controller for lateral control
+            k_e = 0.9
+            k_s = 0.08
+
+            dy = waypoints[-1][1] - waypoints[0][1]
+            dx = waypoints[-1][0] - waypoints[0][0]
+
+            yaw_path = np.arctan2(dy, dx)
+
+            def constraint_angle(angle: float, max_angle: float = None) -> float:
+                if angle > np.pi:
+                    angle -= 2 * np.pi
+                elif angle < -np.pi:
+                    angle += 2 * np.pi
+                if max_angle:
+                    angle = max(-max_angle, min(max_angle, angle))
+                return angle
+
+            # heading error
+            yaw_heading_err = constraint_angle(yaw - yaw_path)
+
+            # cross-track error
+            current_xy = np.array([x, y])
+
+            # closest path point to x,y
+            c_xyi = np.argmin(np.sum((current_xy - np.array(waypoints)[:, :2]) ** 2, axis=1))
+            cxy = np.array(waypoints)[c_xyi, :2]
+            cross_track_error_v = current_xy - cxy
+            cross_track_error = np.sqrt(cross_track_error_v @ cross_track_error_v)
+
+            yaw_cross_track = constraint_angle(np.arctan2(y - waypoints[0][1], x - waypoints[0][0]))
+
+            if constraint_angle(yaw_path - yaw_cross_track) > 0:
+                cross_track_error *= -1
+
+            yaw_diff_cross_track = np.arctan(k_e * cross_track_error / v) if abs(v) > 1 else np.arctan(
+                k_e * cross_track_error / (k_s + v))
+
+            # final expected steering
+            steer_expect = constraint_angle(-yaw_heading_err - yaw_diff_cross_track, 1.22)
+
+            # update
+            steer_output = steer_expect
 
             ######################################################
             # SET CONTROLS OUTPUT
