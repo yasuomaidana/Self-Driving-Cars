@@ -44,3 +44,15 @@ $$\hat{\bm{P}}_{k}=\left(\bm{1}-\bm{K}_{k}\bm{H}_{k}\right)\check{\bm{P}}_{k}$$
 ![data](./data.jpg)
 ![prediction](./prediction.jpg)
 ![correction](./correction.jpg)
+
+## Additional Material
+
+* [Blog post](https://www.bzarg.com/p/how-a-kalman-filter-works-in-pictures/) by Tim Babb explaining the Kalman filter.  Babb is the Lighting Optimization Lead for Pixar Animation Studios.
+
+* You can find an extensive, detailed treatment of the Kalman filter in Chapter 3, Section 3 of Timothy D. Barfoot, [State Estimation for Robotics](./State%20estimation%20for%20robotics-e.pdf) (2017) (available for free).
+
+* Read another detailed explanation in Chapter 5, Section 1 of Dan Simon, Optimal State Estimation (2006).
+
+* Explore a variety of great resources related to the Kalman filter on [this page](https://www.cs.unc.edu/~welch/kalman/) maintained by Greg Welch from the University of Central Florida and Gary Bishop from the University of North Carolina at Chapel Hill.
+
+* Read Kalman's [original article](https://www.cs.unc.edu/~welch/kalman/kalmanPaper.html) on the linear filter, courtesy of Welch and Bishop and hosted at UNC at Chapel Hill (available for free).
