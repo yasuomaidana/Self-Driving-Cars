@@ -26,3 +26,20 @@ We now have a linear system in state-space! The matrices $\bm{F}_{k-1}$, $\bm{L}
 called the Jacobian matrices of the system.
 
 Intuitively, the Jacobian matrix tells you how fast each output of the function is changing along each input dimension
+
+## Putting it all together
+
+With our linearized models and Jacobians, we can now use the Kalman Filter equations!
+
+![all together](./all%20together.jpg)
+
+## Example
+
+![example p1](./example%20p1.jpg)
+![example p2](./example%202.jpg)
+![example p3](./example%20p3.jpg)
+
+Using the Extended Kalman Filter equations, what is our updated position?
+$$\hat{p}_1$$
+![result](./result.jpg)
+![result 2](./result2.jpg)
