@@ -43,3 +43,26 @@ Using the Extended Kalman Filter equations, what is our updated position?
 $$\hat{p}_1$$
 ![result](./result.jpg)
 ![result 2](./result2.jpg)
+
+## An Improvement EKF - The Error State Extended Kalman Filter
+
+What's in a State?
+
+We can think Of the vehicle state as composed Of two parts:
+
+$$\bm{x}=\bm{\hat{x}}+\delta\bm{x}$$
+
+* $\bm{x}$: True State
+* $\bm{\hat{x}}$: Nominal State ("Large")
+* $\delta\bm{x}$: Error State ("Small")
+
+![whats in a state](./whats%20in%20a%20state.jpg)
+
+* We can continuously update the nominal state by integrating the motion model
+* Modelling errors and process noise accumulate into the error state
+
+## Additional Resources
+
+* To learn more about nonlinear Kalman filtering, check out [this article](https://www.embedded.com/using-nonlinear-kalman-filtering-to-estimate-signals/) by Dan Simon (available for free).
+
+* A detailed explanation of linearization and how it relates to the EKF can be found in Chapter 13,  Sections 1 and 2 of Dan Simon, Optimal State Estimation (2006)
