@@ -61,8 +61,52 @@ $$\bm{x}=\bm{\hat{x}}+\delta\bm{x}$$
 * We can continuously update the nominal state by integrating the motion model
 * Modelling errors and process noise accumulate into the error state
 
+### The Error-State Extended Kalman Filter
+
+The Error-State Extended Kalman Filter estimates the error state directly and uses it as a correction to the nominal state:
+
+**Linearized motion model**
+$$\bm{x}_k = \bm{f}_{k-1}(\bm{\hat{x}}_{k-1},\bm{u}_{k-1},\bm{0})+\bm{F}_{k-1}(\bm{x}_{k-1}-\bm{\hat{x}}_{k-1})+\bm{L}_{k-1}\\\downarrow\\
+\bm{x}_k - \bm{f}_{k-1}(\bm{\hat{x}}_{k-1},\bm{u}_{k-1},\bm{0})=\bm{F}_{k-1}(\bm{x}_{k-1}-\bm{\hat{x}}_{k-1})+\bm{L}_{k-1}\\ \downarrow \\
+\delta\bm{x}_k= \bm{x}_k - \bm{f}_{k-1}(\bm{\hat{x}}_{k-1},\bm{u}_{k-1},\bm{0}) \quad  \delta\bm{x}_{k-1}= \bm{x}_{k-1} - \bm{\hat{x}}_{k-1}$$
+
+**Linearized measurement model**
+$$\bm{y}_k= \bm{h}_k(\bm{\check{x},0})+\bm{H}_k(\bm{x}_k-\check{\bm{x}}_k)+\bm{M}_k\bm{v}_k\\\downarrow\\
+\bm{x}_k-\check{\bm{x}}_k=\delta\bm{x}_k$$
+
+> Where $\delta\bm{x}_k$ and $\delta\bm{x}_{k-1}$ are Error States
+
+Loop:
+
+1. Update nominal state with motion model:
+$$\check{\bm{x}}_k=\bm{f}_{k-1}(\bm{x}_{k-1},\bm{u}_{k-1},\bm{0}) \quad\quad \bm{x}_{k-1} \text{ could be also } \bm{\check{x}}_{k-1} \text{ or } \bm{\hat{x}}_{k-1}$$
+2. Propagate uncertainity
+$$\bm{\check{P}}_k=\bm{F}_{k-1}\bm{P}_{k-1}\bm{F}_{k-1}^T+\bm{L}_{k-1}\bm{Q}_{k-1}\bm{L}_{k-1}^T \quad\quad \bm{P}_{k-1} \text{ could be also } \bm{\check{P}}_{k-1} \text{ or } \bm{\hat{P}}_{k-1}$$
+3. If a measurement is available:
+   1. Compute Kalman Gain
+   $$\bm{K}_k= \bm{\check{P}}_{k}\bm{H}_k^T(\bm{H}_k\bm{\check{P}}_{k}\bm{H}_k^T+\bm{R})^-1$$
+   2. Compute error state $$\delta\bm{\hat{x}}_k=\bm{K}_k(\bm{y}_k-\bm{h}_k(\check{\bm{x}}_k,0))$$
+   3. Correct nominal state $$\bm{\hat{x}}_k=\check{\bm{x}}_k+\delta\bm{\hat{x}}_k$$
+   4. Update state covariance $$\hat{\bm{P}}_k=(\bm{1}-\bm{K}_k\bm{H}_k)\check{\bm{P}}_k$$
+
+## Why use the ES-EKF?
+
+**Better performance compared to the vanilla EKF**</br>
+The "small" error state is more amenable to linear filtering than the "large" nominal state, which can be integrated nonlinearly
+
+**Easy to work with constrained quantities (e.g., rotations in 3D)** </br>
+We can also break down the state using a generalized composition operator
+$$\bm{x}=\hat{\bm{x}}\oplus\delta\bm{x}$$
+>$\bm{x}$ true state</br>
+>$\bm{\hat{x}}$ Nominal State (Overparamatrized, constrained)</br>
+>$\delta\bm{x}$ Error State (Minimal parametrization, unsconstrained)
+
 ## Additional Resources
 
 * To learn more about nonlinear Kalman filtering, check out [this article](https://www.embedded.com/using-nonlinear-kalman-filtering-to-estimate-signals/) by Dan Simon (available for free).
 
 * A detailed explanation of linearization and how it relates to the EKF can be found in Chapter 13,  Sections 1 and 2 of Dan Simon, Optimal State Estimation (2006)
+
+* Review an important paper by Stergios Roumeliotis et al. on the use of the error-state Kalman filter for mobile robot localization. This paper deals with the important case of aided localization.
+
+* Read Section 5 of a technical report by Joan Solà, [Quaternion kinematics for the error-state Kalman filter](https://arxiv.org/pdf/1711.02508.pdf), 2017
