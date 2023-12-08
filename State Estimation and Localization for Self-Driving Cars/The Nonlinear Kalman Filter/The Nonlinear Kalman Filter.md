@@ -132,6 +132,99 @@ Computing Jacobian matrices for complicated nonlinear functions is also a common
 * Numerical differentiation can be slow and unstable
 * Automatic differentiation (e.g., at compile time) can also behave unpredictably
 
+## An Alternative to the EKF - The Unscented Kalman Filter
+
+"It is easier to approximate a probability distribution than it is to approximate an arbitrary nonlinear function" <cite>— S.Julier, J. Uhlmann, and H. Durrant-Whyte (2000)</cite>
+![unscented kalman filter](./unscented%20kf.jpg)
+
+### Choosing sigmapoints
+
+For an $N$-dimensional $\mathcal{N}(\bm{\mu_x},\bm{\Sigma_{xx}})$ PDF we need $2N+ 1$ sigma points:
+
+1. Compute the Cholesky Decomposition of the covariance matrix
+$$\bm{L}\bm{L}^T=\bm{\Sigma_{xx}} \quad (\bm{L} \text{ lower triangular})$$
+2. Calculate the sigma-points
+$$\bm{x}_0=\bm{\mu}_x\\
+\bm{x}_i=\bm{\mu}_x+\sqrt{N+\kappa} \ col_i\bm{L} \quad i=1,\dots N\\
+\bm{x}_{i+N}=\bm{\mu}_x-\sqrt{N+\kappa} \ col_i\bm{L} \quad i=1,\dots N
+$$
+
+> Where $\kappa=3-N$ for partial PDFs
+
+#### Transforming and recombining
+
+Next we pass each of our $2N+ 1$ sigma points through the nonlinear function $\bm{h}(\bm{x})$
+$$\bm{y}_i=\bm{h}(\bm{x_i}) \quad i=0,\dots,2N$$
+
+And finally compute the mean and covariance of the output PDF
+
+$$\text{Mean: }\bm{\mu}_{y}=\sum_{i=0}^{2N}\alpha_i\bm{y}_i$$
+$$\text{Covariance: }\bm{\Sigma}_{yy}=\sum_{i=0}^{2N}\alpha_i(\bm{y}_i-\bm{\mu}_{y})(\bm{y}_i-\bm{\mu}_{y})^T$$
+
+$$\text{Weights: } \bm{\alpha}_i=\left\{
+  \begin{aligned}
+  \frac{\kappa}{N+\kappa} && i =0 \\
+  \frac{1}{2}\frac{1}{N+\kappa} && \text{otherwise}
+  \end{aligned}
+\right.$$
+
+## The Unscented Kalman Filter (UKF)
+We can easily use the Unscented Transform in our Kalman Filtering framework with nonlinear models:
+
+**Nonlinear motion model** $$\bm{x}_k=\bm{f}_{k-1}(\bm{x}_{k-1},\bm{u}_{k-1},\bm{w}_{k-1})\\\bm{w}_k\sim\mathcal{N}(\bm{0},\bm{Q}_k)$$
+**Nonlinear measurement model** $$\bm{y}_k=\bm{h}_k(\bm{x}_k,\bm{v}_k)\\\bm{v}_k\sim\mathcal{N}(\bm{0},\bm{R}_k)$$
+
+Instead of approximating the system equations by linearizing, we will calculate sigma points and use the Unscented Transform to approximate the PDFs directly!
+
+### Prediction step
+To propagate the state from time $(k— 1)$ to time $k$, apply the Unscented Transform using the current best guess for the mean and covariance
+
+1. Compute sigma points
+$$\bm{\hat{L}}_{k-1}\bm{\hat{L}}_{k-1}^T=\bm{\hat{P}}_{k-1}$$
+$$\bm{\hat{x}}_{k-1}^{(0)}=\bm{\hat{x}}_{k-1}$$
+$$\bm{\hat{x}}_{k-1}^{(i)}=\bm{\hat{x}}_{k-1}+\sqrt{N+\kappa} \ col_i\bm{\hat{L}}_{k-1} \quad i=1,\dots N$$
+$$
+\bm{\hat{x}}_{k-1}^{(i+N)}=\bm{\hat{x}}_{k-1}-\sqrt{N+\kappa} \ col_i\bm{\hat{L}}_{k-1} \quad i=1,\dots N
+$$
+
+2. Propagate sigma points
+$$\bm{\check{x}}_k^{(i)}=\bm{f}_{k-1}(\bm{\hat{x}}_{k-1}^{(i)},\bm{u}_{k-1},\bm{0}) \quad i=0,\dots 2N$$
+
+3. Compute predicted mean and covariance
+$$\bm{\alpha}^{(i)}=\left\{
+  \begin{aligned}
+  \frac{\kappa}{N+\kappa} && i =0 \\
+  \frac{1}{2}\frac{1}{N+\kappa} && \text{otherwise}
+  \end{aligned}
+\right.$$
+$$\bm{\check{x}}_{k}=\sum_{i=0}^{2N}\alpha^{(i)}\bm{\check{x}}_k^{(i)}$$
+$$\bm{\check{P}}_{k}=\sum_{i=0}^{2N}\alpha^{(i)}(\bm{\check{x}}_k^{(i)}-\bm{\check{x}}_{k})(\bm{\check{x}}_k^{(i)}-\bm{\check{x}}_{k})^T+\bm{Q}_{k-1}$$
+
+> $\bm{Q}_{k-1}$ Additive process noise
+
+### Correction step
+
+To correct the state estimate using measurements at time k, use the nonlinear measurement model and the sigma points from the prediction step to predict the measurements
+
+1. Predict measurements from propagated sigma points
+$$\bm{\hat{y}}_k^{(i)}=\bm{h}_k(\bm{\check{x}}_k^{(i),\bm{0}})\quad i=0,\dots2N$$
+2. Estimate mean and covariance of predicted measurements
+$$\bm{\hat{y}}_{k}=\sum_{i=0}^{2N}\alpha^{(i)}\bm{\hat{y}}_k^{(i)}$$
+$$\bm{P}_{y}=\sum_{i=0}^{2N}\alpha^{(i)}(\bm{\hat{y}}_k^{(i)}-\bm{\hat{y}}_{k})(\bm{\hat{y}}_k^{(i)}-\bm{\hat{y}}_{k})^T+\bm{R}_{k}$$
+
+3. Compute cross-covariance and Kalman gain
+$$\bm{P}_{xy}=\sum_{i=0}^{2N}\alpha^{(i)}(\bm{\check{x}}_k^{(i)}-\bm{\check{x}}_{k})(\bm{\hat{y}}_k^{(i)}-\bm{\hat{y}}_{k})^T$$
+$$\bm{K}_k=\bm{P}_{xy}\bm{P}_{y}^{-1}$$
+
+4. Compute corrected mean and covariance
+$$\bm{\hat{x}}_k=\check{\bm{x}}_k=\bm{K}_k(\bm{y}_k-\bm{\hat{y}}_k)$$
+$$\bm{\hat{P}}_k=\check{\bm{P}}_k-\bm{K}_k\bm{P}_y\bm{K}_k^T$$
+
+>$\bm{R}_{k}$ Additive measurement noise
+
+### UKF | Short example
+![example p1](./example%20p1.jpg)
+
 ## Additional Resources
 
 * To learn more about nonlinear Kalman filtering, check out [this article](https://www.embedded.com/using-nonlinear-kalman-filtering-to-estimate-signals/) by Dan Simon (available for free).
