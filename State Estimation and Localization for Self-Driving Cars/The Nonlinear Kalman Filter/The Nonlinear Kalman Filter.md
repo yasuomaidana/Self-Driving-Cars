@@ -101,6 +101,37 @@ $$\bm{x}=\hat{\bm{x}}\oplus\delta\bm{x}$$
 >$\bm{\hat{x}}$ Nominal State (Overparamatrized, constrained)</br>
 >$\delta\bm{x}$ Error State (Minimal parametrization, unsconstrained)
 
+## Limitation of the EKF
+
+The EKF works by linearizing the nonlinear motion and measurement models to update the mean and covariance of the state.
+
+The difference between the linear approximation and the nonlinear function is called linearization error
+
+In general, linearization error depends on:
+
+1. How nonlinear the function is
+2. How far away from the operating point the linear approximation is being used
+
+![linearized error](./linearized%20error.jpg)
+$$f(x)\approx f(a)+\left. \frac{\partial f(x)}{\partial x} \right|_{x=a} (x-a)$$
+
+The EKF is prone to linearization error when:
+1. The system dynamics are highly nonlinear
+2. The sensor sampling time is slow relative how fast the system is evolving
+
+This has two important consequences:
+1. The estimated mean state can become very different from the true state
+2. The estimated state covariance can fail to capture the true uncertainty in the state
+
+> Linearization error can cause the estimator to be
+overconfident in a wrong answer!
+
+Computing Jacobian matrices for complicated nonlinear functions is also a common source of error in EKF implementations!
+
+* Analytical differentiation is prone to human error
+* Numerical differentiation can be slow and unstable
+* Automatic differentiation (e.g., at compile time) can also behave unpredictably
+
 ## Additional Resources
 
 * To learn more about nonlinear Kalman filtering, check out [this article](https://www.embedded.com/using-nonlinear-kalman-filtering-to-estimate-signals/) by Dan Simon (available for free).
