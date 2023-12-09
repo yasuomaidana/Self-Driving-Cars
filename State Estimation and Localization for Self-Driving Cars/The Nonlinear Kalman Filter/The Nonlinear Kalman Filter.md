@@ -245,6 +245,13 @@ $$\bm{\hat{P}}_k=\check{\bm{P}}_k-\bm{K}_k\bm{P}_y\bm{K}_k^T$$
 
 * A detailed explanation of linearization and how it relates to the EKF can be found in Chapter 13,  Sections 1 and 2 of Dan Simon, Optimal State Estimation (2006)
 
-* Review an important paper by Stergios Roumeliotis et al. on the use of the error-state Kalman filter for mobile robot localization. This paper deals with the important case of aided localization.
+* Review *[Circumventing dynamic modeling: evaluation of the error-state Kalman filter applied to mobile robot localization](https://ieeexplore.ieee.org/document/772597)* by Stergios Roumeliotis et al. on the use of the error-state Kalman filter for mobile robot localization. This paper deals with the important case of aided localization.
 
 * Read Section 5 of a technical report by Joan Solà, [Quaternion kinematics for the error-state Kalman filter](https://arxiv.org/pdf/1711.02508.pdf), 2017
+
+* A research paper on [The Unscented Kalman Filters for Nonlinear Estimation](https://groups.seas.harvard.edu/courses/cs281/papers/unscented.pdf) by the Oregon Graduate Institute of Science & Technology
+
+* Read a tutorial on the [Unscented Kalman Filter](./TutorialUKF-e.pdf)
+ by Gabriel A. Terejanu.
+
+* Dig into the original article *["A New Extension of the Kalman Filter to Nonlinear Systems"](https://www.cs.unc.edu/~welch/kalman/media/pdf/Julier1997_SPIE_KF.pdf)* by Simon Julier and Jeffrey Uhlmann that introduced the unscented Kalman filter.
