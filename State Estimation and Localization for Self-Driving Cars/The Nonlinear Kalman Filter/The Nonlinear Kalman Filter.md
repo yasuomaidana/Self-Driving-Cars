@@ -224,6 +224,20 @@ $$\bm{\hat{P}}_k=\check{\bm{P}}_k-\bm{K}_k\bm{P}_y\bm{K}_k^T$$
 
 ### UKF | Short example
 ![example p1](./example%20p1.jpg)
+![ukf example p2](./UTF%20Example%201.jpg)
+![ukf example p3](./UTF%20Example%202.jpg)
+![ukf example p4](./UTF%20Example%203.jpg)
+![ukf example p5](./UTF%20Example%204.jpg)
+![ukf example p6](./UTF%20Example%205.jpg)
+
+## Summary
+
+||EKF|ES-EKF|UKF|
+|--|---|---|---|
+|**Operating Principle**|<center>Linearization </br> (Full State)</center>|<center>Linearization </br>(Error State)</center>|Unscented Transform|
+|**Accuracy**|Good|Better|Best|
+|**Jacobians**|Required|Required|Not required|
+|**Speed**|Slightly faster|Slightly faster|Slightly slower
 
 ## Additional Resources
 
