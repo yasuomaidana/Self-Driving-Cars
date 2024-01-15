@@ -74,3 +74,12 @@ $$\xrightarrow{\mathcal{F}}_{ECEF}$$
 
 ## Sensor & Vehicle
 ![Sensor and Vehicle](./Sensor%20&%20Vehicle.jpg)
+
+## Supplementary Reading: 3D Geometry and Reference Frames
+
+* Read Chapter 6, Sections 1 to 3 of Timothy D. Barfoot, [State Estimation for Robotics](http://asrl.utias.utoronto.ca/~tdb/bib/barfoot_ser17.pdf) (2017).
+
+* Make use of this [online interactive quaternion calculator](https://quaternions.online/)
+ and a handy online [3D rotation converter](https://www.andre-gaschler.com/rotationconverter/).
+
+* Read the [Wikipedia article](https://en.wikipedia.org/wiki/Rotation_matrix) on rotation matrices.
