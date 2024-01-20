@@ -110,3 +110,11 @@ $$\mathcal{L}_{LS}(\bm{x})=\bm{e}^T\bm{e}\\
 \bm{b}^T\bm{A}\bm{x}+\bm{b}^T\bm{b}$$
 
 [See](../Least%20Squares/Squared%20Error%20Criterion.md)
+
+## Additional resources
+
+To learn more about LIDAR sensor models and point clouds, check out the resources below:
+
+Read Chapter 6, Sections 1 and 2 of [Timothy D. Barfoot, State Estimation for Robotics (2016)](http://asrl.utias.utoronto.ca/~tdb/bib/barfoot_ser17.pdf).
+
+Explore the functionality available in the Point Cloud Library (PCL) at http://pointclouds.org/
