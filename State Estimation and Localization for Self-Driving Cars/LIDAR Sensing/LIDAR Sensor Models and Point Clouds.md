@@ -67,3 +67,46 @@ $$\bm{P}_{s'}=\bm{S}_{s's}\bm{P}_{s}\quad\quad \text{For whole cloud}$$
 Point coordinates in the transformed frame
 $$\bm{p}_{s'}^{(j)}=\bm{S}_{s's}\bm{C}_{s's}\left(\bm{p}_{s}^{(j)} - \bm{r}_{s}^{s's}\right)\quad\quad \text{For each point}$$
 $$\bm{P}_{s'}=\bm{S}_{s's}\bm{C}_{s's}\left(\bm{P}_{s} - \bm{R}_{s}^{s's}\right)\quad\quad \text{For whole cloud}$$
+
+## Finding the Road with 3D Plane Fitting
+![zplane](./Z%20plane.jpg)
+Equation of a plane in 3D:
+$$z = a +bx + cy$$
+We have measurements of $(x, y, z)$ and we want to determine the parameters $(a, b, c)$ — *use least-squares!*
+
+Measurement error:
+$$e_j=\hat{z}_j-z_j \\=\left(\hat{a} + \hat{b}x_j+\hat{c}y_j \right)-z_j \quad i=1\dots n$$
+
+We can stack all of the measurement errors into matrix form
+
+$$\begin{bmatrix}e_1\\e_2\\ \vdots\\ e_n\end{bmatrix}=
+\begin{bmatrix}
+1&&x_1&&y_1\\
+1&&x_2&&y_2\\
+\vdots && \vdots && \vdots \\
+1&&x_n&&y_n
+\end{bmatrix}
+\begin{bmatrix} a\\b\\c\end{bmatrix} -
+\begin{bmatrix}z_1\\z_2\\ \vdots\\ z_n \end{bmatrix}$$
+
+Where:
+
+* $\bm{e}=\begin{bmatrix}e_1\\e_2\\ \vdots\\ e_n\end{bmatrix}$
+* $\bm{A}=\begin{bmatrix}
+1&&x_1&&y_1\\
+1&&x_2&&y_2\\
+\vdots && \vdots && \vdots \\
+1&&x_n&&y_n
+\end{bmatrix}$
+* $\bm{x}=\begin{bmatrix} a\\b\\c\end{bmatrix}$
+* $\bm{b}=\begin{bmatrix}z_1\\z_2\\ \vdots\\ z_n \end{bmatrix}$
+
+And minimize the squared-error criterion to get the least-squares solution for the parameters
+
+$$\hat{\bm{x}} = \argmin_{\bm{x}} \mathcal{L}_{LS}(\bm{x})$$
+$$\mathcal{L}_{LS}(\bm{x})=\bm{e}^T\bm{e}\\
+= \left(\bm{A}\bm{x}-\bm{b}\right)^T\left(\bm{A}\bm{x}-\bm{b}\right)\\=
+\bm{x}^T\bm{A}^T\bm{A}\bm{x}-\bm{x}^T\bm{A}^T\bm{b}-
+\bm{b}^T\bm{A}\bm{x}+\bm{b}^T\bm{b}$$
+
+[See](../Least%20Squares/Squared%20Error%20Criterion.md)
