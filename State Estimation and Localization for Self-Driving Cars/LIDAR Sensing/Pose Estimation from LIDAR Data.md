@@ -73,3 +73,16 @@ Error term
 $$\mathcal{L}=\sum_{j=1}^{n}{\bm{e}^{(j)}}^T\bm{e}^{(j)}$$
 
 ![Error functions](./Error%20functions.jpg)
+
+## Additional material
+
+* Read Chapter 8, Section 1.3 of [Timothy D. Barfoot, State Estimation for Robotics (2016)](http://asrl.utias.utoronto.ca/~tdb/bib/barfoot_ser17.pdf).
+
+* Read the Wikipedia articles on [point set registration](https://en.wikipedia.org/wiki/Point_set_registration) and [ICP](https://en.wikipedia.org/wiki/Iterative_closest_point).
+
+* Examine a method to produce an accurate [closed-form estimate of  ICP's covariance](https://ieeexplore.ieee.org/document/4209579) from Andrea Censi of the University of Rome "La Sapienza" (now at ETH Zurich).
+
+* Read a research paper on [LIDAR and Inertial Fusion for Pose Estimation by Non-linear Optimization](https://arxiv.org/abs/1710.07104), available for free on arXiv.
+
+*Review the original papers by [Yang Chen and Gerard Medioni (1991)](https://ieeexplore.ieee.org/document/132043), and [Paul Besl and Neil McKay (1992)](https://ieeexplore.ieee.org/document/121791)
+, that first described (variations of the) iterative closest point (ICP) algorithm.
