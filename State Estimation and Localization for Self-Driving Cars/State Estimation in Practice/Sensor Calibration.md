@@ -24,3 +24,9 @@
 
 ![Sensors](./Sensors.jpg)
 $$\{\bm{C}_{LI},\bm{r}_1^{LI} \}$$
+
+## Additional material
+
+* Read an [interesting article](https://www.rscal.com/all-you-need-to-know-about-sensor-calibration/) Mon why sensor calibration is necessary.
+* Read a [blog_post](https://aimotive.com/blog/content/1227) from Almotive about the need for sensor spatial calibration and temporal synchronization.
+* Explore the [cloud-based calibration](http://apollo.auto/platform/perception.html) service for self-driving cars provided by Baidu's Apollo initiative.
