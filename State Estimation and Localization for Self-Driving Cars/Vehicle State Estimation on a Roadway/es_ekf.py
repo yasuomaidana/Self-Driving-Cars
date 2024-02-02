@@ -138,7 +138,7 @@ lidar_i = 0
 def measurement_update(sensor_var, p_cov_check: np.ndarray, y_k, p_check: np.ndarray, v_check, q_check):
     # 3.1 Compute Kalman Gain
 
-    to_invert = h_jac.dot(p_cov_check.T).dot(h_jac.T + np.diagonal(sensor_var))
+    to_invert = h_jac@p_cov_check@h_jac.T + sensor_var
     if np.linalg.det(to_invert) == 0:
         raise "Singular matrix"
     k_k = p_cov_check.dot(h_jac.T).dot(np.linalg.inv(to_invert))
@@ -166,14 +166,39 @@ for k in range(1, imu_f.data.shape[0]):  # start at 1 b/c we have initial predic
     delta_t = imu_f.t[k] - imu_f.t[k - 1]
 
     # 1. Update state with IMU inputs
+    C_ns = Quaternion(*q_est[k - 1]).to_mat()
+    C_ns_dot_f_km = C_ns @ imu_f.data[k - 1]
+    p_est[k] = p_est[k - 1] + delta_t * v_est[k - 1] + delta_t ** 2 * (C_ns_dot_f_km + g) / 2
+    v_est[k] = v_est[k - 1] + delta_t * (C_ns_dot_f_km + g)
+    q_est[k] = Quaternion(euler=delta_t * imu_w.data[k - 1]).quat_mult_right(q_est[k - 1])
 
     # 1.1 Linearize the motion model and compute Jacobians
+    F_km = np.identity(9)
+    F_km[0:3, 3:6] = np.identity(3) * delta_t
+    F_km[3:6, 6:9] = -skew_symmetric(C_ns_dot_f_km) * delta_t
 
     # 2. Propagate uncertainty
+    Q = np.eye(6)
+    Q[:3, :3] = var_imu_f * delta_t ** 2 * np.eye(3)
+    Q[3:, 3:] = var_imu_w * delta_t ** 2 * np.eye(3)
+
+    p_cov[k] = F_km @ p_cov[k - 1] @ F_km.T + l_jac @ Q @ l_jac.T
 
     # 3. Check availability of GNSS and LIDAR measurements
+    R_GNSS = np.identity(3) * var_gnss  # covariance matrix related to GNSS
+    R_Lidar = np.identity(3) * var_lidar  # covariance matrix related to Lidar
 
     # Update states (save)
+
+    if lidar_i < lidar.t.shape[0] and lidar.t[lidar_i] <= imu_f.t[k - 1]:
+        p_est[k], v_est[k], q_est[k], p_cov[k] = measurement_update(
+            R_Lidar, p_cov[k], lidar.data[lidar_i].T, p_est[k], v_est[k], q_est[k])
+        lidar_i += 1
+
+    if gnss_i < gnss.t.shape[0] and gnss.t[gnss_i] <= imu_f.t[k - 1]:
+        p_est[k], v_est[k], q_est[k], p_cov[k] = measurement_update(
+            R_GNSS, p_cov[k], gnss.data[gnss_i].T, p_est[k], v_est[k], q_est[k])
+        gnss_i += 1
 
 #### 6. Results and Analysis ###################################################################
 
@@ -260,21 +285,24 @@ for val in p1_indices:
         p1_str += '%.3f ' % (p_est[val, i])
 with open('pt1_submission.txt', 'w') as file:
     file.write(p1_str)
+file.close()
 
 # Pt. 2 submission
-# p2_indices = [9000, 9400, 9800, 10200, 10600]
-# p2_str = ''
-# for val in p2_indices:
-#     for i in range(3):
-#         p2_str += '%.3f ' % (p_est[val, i])
-# with open('pt2_submission.txt', 'w') as file:
-#     file.write(p2_str)
+p2_indices = [9000, 9400, 9800, 10200, 10600]
+p2_str = ''
+for val in p2_indices:
+    for i in range(3):
+        p2_str += '%.3f ' % (p_est[val, i])
+with open('pt2_submission.txt', 'w') as file:
+    file.write(p2_str)
+file.close()
 
 # Pt. 3 submission
-# p3_indices = [6800, 7600, 8400, 9200, 10000]
-# p3_str = ''
-# for val in p3_indices:
-#     for i in range(3):
-#         p3_str += '%.3f ' % (p_est[val, i])
-# with open('pt3_submission.txt', 'w') as file:
-#     file.write(p3_str)
+p3_indices = [6800, 7600, 8400, 9200, 10000]
+p3_str = ''
+for val in p3_indices:
+    for i in range(3):
+        p3_str += '%.3f ' % (p_est[val, i])
+with open('pt3_submission.txt', 'w') as file:
+    file.write(p3_str)
+file.close()
