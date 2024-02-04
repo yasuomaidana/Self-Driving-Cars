@@ -33,7 +33,7 @@ $$\bm{u}_k=\begin{bmatrix} \bm{f}_k \\ \bm{\omega}_k \end{bmatrix} \in R^{6} $$
 
 * *Position* $\quad\bm{p}_k=\bm{p}_{k-1}+\Delta t \bm{p}_{v-1} + \frac{\Delta t^2}{2}\left( \bm{C}_{ns}\bm{f}_{k-1}+\bm{g}\right)$
 * *Velocity* $\quad\bm{v}_k=\bm{v}_{k-1}+\Delta t\left( \bm{C}_{ns}\bm{f}_{k-1}+\bm{g}\right)$
-* *Orientation* $\quad\bm{q}_k=\bm{q}_{k-1}\otimes+\bm{q}\left(\bm{\omega}_{k-1}\Delta t\right) = \bm{\Omega}\left(\bm{q}(\bm{\omega}_{k-1}\Delta t)\right) \bm{q}_{k_-1}$
+* *Orientation* $\quad\bm{q}_k=\bm{q}_{k-1}\otimes \bm{q}\left(\bm{\omega}_{k-1}\Delta t\right) = \bm{\Omega}\left(\bm{q}(\bm{\omega}_{k-1}\Delta t)\right) \bm{q}_{k_-1}$
 
 Where:
 $$\bm{C}_{ns}=\bm{C}_{ns}(\bm{q}_{k-1})$$
