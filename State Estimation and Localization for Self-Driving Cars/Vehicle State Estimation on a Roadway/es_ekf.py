@@ -53,7 +53,7 @@ lidar = data['lidar']
 ################################################################################################
 gt_fig = plt.figure()
 ax = gt_fig.add_subplot(111, projection='3d')
-ax.plot(gt.p[:,0], gt.p[:,1], gt.p[:,2])
+ax.plot(gt.p[:, 0], gt.p[:, 1], gt.p[:, 2])
 ax.set_xlabel('x [m]')
 ax.set_ylabel('y [m]')
 ax.set_zlabel('z [m]')
@@ -72,9 +72,9 @@ plt.show()
 ################################################################################################
 # Correct calibration rotation matrix, corresponding to Euler RPY angles (0.05, 0.05, 0.1).
 C_li = np.array([
-   [ 0.99376, -0.09722,  0.05466],
-   [ 0.09971,  0.99401, -0.04475],
-   [-0.04998,  0.04992,  0.9975 ]
+    [0.99376, -0.09722, 0.05466],
+    [0.09971, 0.99401, -0.04475],
+    [-0.04998, 0.04992, 0.9975]
 ])
 
 # Incorrect calibration rotation matrix, corresponding to Euler RPY angles (0.05, 0.05, 0.05).
@@ -98,7 +98,7 @@ lidar.data = (C_li @ lidar.data.T).T + t_i_li
 ################################################################################################
 var_imu_f = 0.10
 var_imu_w = 0.25
-var_gnss  = 0.01
+var_gnss = 0.01
 var_lidar = 1.00
 
 ################################################################################################
@@ -125,8 +125,9 @@ p_est[0] = gt.p[0]
 v_est[0] = gt.v[0]
 q_est[0] = Quaternion(euler=gt.r[0]).to_numpy()
 p_cov[0] = np.zeros(9)  # covariance of estimate
-gnss_i  = 0
+gnss_i = 0
 lidar_i = 0
+
 
 #### 4. Measurement Update #####################################################################
 
@@ -134,16 +135,26 @@ lidar_i = 0
 # Since we'll need a measurement update for both the GNSS and the LIDAR data, let's make
 # a function for it.
 ################################################################################################
-def measurement_update(sensor_var, p_cov_check, y_k, p_check, v_check, q_check):
+def measurement_update(sensor_var, p_cov_check: np.ndarray, y_k, p_check: np.ndarray, v_check, q_check):
     # 3.1 Compute Kalman Gain
 
+    to_invert = h_jac@p_cov_check@h_jac.T + sensor_var
+    if np.linalg.det(to_invert) == 0:
+        raise "Singular matrix"
+    k_k = p_cov_check.dot(h_jac.T).dot(np.linalg.inv(to_invert))
+
     # 3.2 Compute error state
+    error_state = k_k @ (y_k - p_check)
 
     # 3.3 Correct predicted state
+    p_hat = p_check + error_state[0:3]
+    v_hat = v_check + error_state[3:6]
+    q_hat = Quaternion(euler=error_state[6:9]).quat_mult_left(q_check)
 
     # 3.4 Compute corrected covariance
-
+    p_cov_hat = (np.identity(9) - k_k @ h_jac) @ p_cov_check
     return p_hat, v_hat, q_hat, p_cov_hat
+
 
 #### 5. Main Filter Loop #######################################################################
 
@@ -155,14 +166,39 @@ for k in range(1, imu_f.data.shape[0]):  # start at 1 b/c we have initial predic
     delta_t = imu_f.t[k] - imu_f.t[k - 1]
 
     # 1. Update state with IMU inputs
+    C_ns = Quaternion(*q_est[k - 1]).to_mat()
+    C_ns_dot_f_km = C_ns @ imu_f.data[k - 1]
+    p_est[k] = p_est[k - 1] + delta_t * v_est[k - 1] + delta_t ** 2 * (C_ns_dot_f_km + g) / 2
+    v_est[k] = v_est[k - 1] + delta_t * (C_ns_dot_f_km + g)
+    q_est[k] = Quaternion(euler=delta_t * imu_w.data[k - 1]).quat_mult_right(q_est[k - 1])
 
     # 1.1 Linearize the motion model and compute Jacobians
+    F_km = np.identity(9)
+    F_km[0:3, 3:6] = np.identity(3) * delta_t
+    F_km[3:6, 6:9] = -skew_symmetric(C_ns_dot_f_km) * delta_t
 
     # 2. Propagate uncertainty
+    Q = np.eye(6)
+    Q[:3, :3] = var_imu_f * delta_t ** 2 * np.eye(3)
+    Q[3:, 3:] = var_imu_w * delta_t ** 2 * np.eye(3)
+
+    p_cov[k] = F_km @ p_cov[k - 1] @ F_km.T + l_jac @ Q @ l_jac.T
 
     # 3. Check availability of GNSS and LIDAR measurements
+    R_GNSS = np.identity(3) * var_gnss  # covariance matrix related to GNSS
+    R_Lidar = np.identity(3) * var_lidar  # covariance matrix related to Lidar
 
     # Update states (save)
+
+    if lidar_i < lidar.t.shape[0] and lidar.t[lidar_i] <= imu_f.t[k - 1]:
+        p_est[k], v_est[k], q_est[k], p_cov[k] = measurement_update(
+            R_Lidar, p_cov[k], lidar.data[lidar_i].T, p_est[k], v_est[k], q_est[k])
+        lidar_i += 1
+
+    if gnss_i < gnss.t.shape[0] and gnss.t[gnss_i] <= imu_f.t[k - 1]:
+        p_est[k], v_est[k], q_est[k], p_cov[k] = measurement_update(
+            R_GNSS, p_cov[k], gnss.data[gnss_i].T, p_est[k], v_est[k], q_est[k])
+        gnss_i += 1
 
 #### 6. Results and Analysis ###################################################################
 
@@ -174,8 +210,8 @@ for k in range(1, imu_f.data.shape[0]):  # start at 1 b/c we have initial predic
 ################################################################################################
 est_traj_fig = plt.figure()
 ax = est_traj_fig.add_subplot(111, projection='3d')
-ax.plot(p_est[:,0], p_est[:,1], p_est[:,2], label='Estimated')
-ax.plot(gt.p[:,0], gt.p[:,1], gt.p[:,2], label='Ground Truth')
+ax.plot(p_est[:, 0], p_est[:, 1], p_est[:, 2], label='Estimated')
+ax.plot(gt.p[:, 0], gt.p[:, 1], gt.p[:, 2], label='Ground Truth')
 ax.set_xlabel('Easting [m]')
 ax.set_ylabel('Northing [m]')
 ax.set_zlabel('Up [m]')
@@ -186,7 +222,7 @@ ax.set_zlim(-2, 2)
 ax.set_xticks([0, 50, 100, 150, 200])
 ax.set_yticks([0, 50, 100, 150, 200])
 ax.set_zticks([-2, -1, 0, 1, 2])
-ax.legend(loc=(0.62,0.77))
+ax.legend(loc=(0.62, 0.77))
 ax.view_init(elev=45, azim=-50)
 plt.show()
 
@@ -219,18 +255,18 @@ p_cov_std = np.sqrt(np.diagonal(p_cov[:, :6, :6], axis1=1, axis2=2))
 titles = ['Easting', 'Northing', 'Up', 'Roll', 'Pitch', 'Yaw']
 for i in range(3):
     ax[0, i].plot(range(num_gt), gt.p[:, i] - p_est[:num_gt, i])
-    ax[0, i].plot(range(num_gt),  3 * p_cov_std[:num_gt, i], 'r--')
+    ax[0, i].plot(range(num_gt), 3 * p_cov_std[:num_gt, i], 'r--')
     ax[0, i].plot(range(num_gt), -3 * p_cov_std[:num_gt, i], 'r--')
     ax[0, i].set_title(titles[i])
-ax[0,0].set_ylabel('Meters')
+ax[0, 0].set_ylabel('Meters')
 
 for i in range(3):
     ax[1, i].plot(range(num_gt), \
-        angle_normalize(gt.r[:, i] - p_est_euler[:num_gt, i]))
-    ax[1, i].plot(range(num_gt),  3 * p_cov_euler_std[:num_gt, i], 'r--')
+                  angle_normalize(gt.r[:, i] - p_est_euler[:num_gt, i]))
+    ax[1, i].plot(range(num_gt), 3 * p_cov_euler_std[:num_gt, i], 'r--')
     ax[1, i].plot(range(num_gt), -3 * p_cov_euler_std[:num_gt, i], 'r--')
-    ax[1, i].set_title(titles[i+3])
-ax[1,0].set_ylabel('Radians')
+    ax[1, i].set_title(titles[i + 3])
+ax[1, 0].set_ylabel('Radians')
 plt.show()
 
 #### 7. Submission #############################################################################
@@ -249,21 +285,24 @@ for val in p1_indices:
         p1_str += '%.3f ' % (p_est[val, i])
 with open('pt1_submission.txt', 'w') as file:
     file.write(p1_str)
+file.close()
 
 # Pt. 2 submission
-# p2_indices = [9000, 9400, 9800, 10200, 10600]
-# p2_str = ''
-# for val in p2_indices:
-#     for i in range(3):
-#         p2_str += '%.3f ' % (p_est[val, i])
-# with open('pt2_submission.txt', 'w') as file:
-#     file.write(p2_str)
+p2_indices = [9000, 9400, 9800, 10200, 10600]
+p2_str = ''
+for val in p2_indices:
+    for i in range(3):
+        p2_str += '%.3f ' % (p_est[val, i])
+with open('pt2_submission.txt', 'w') as file:
+    file.write(p2_str)
+file.close()
 
 # Pt. 3 submission
-# p3_indices = [6800, 7600, 8400, 9200, 10000]
-# p3_str = ''
-# for val in p3_indices:
-#     for i in range(3):
-#         p3_str += '%.3f ' % (p_est[val, i])
-# with open('pt3_submission.txt', 'w') as file:
-#     file.write(p3_str)
+p3_indices = [6800, 7600, 8400, 9200, 10000]
+p3_str = ''
+for val in p3_indices:
+    for i in range(3):
+        p3_str += '%.3f ' % (p_est[val, i])
+with open('pt3_submission.txt', 'w') as file:
+    file.write(p3_str)
+file.close()
