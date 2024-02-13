@@ -24,8 +24,8 @@ The focal length $\bm{f}$ is, once again, the distance between the camera center
 
 Disparity: $$d=x_L-x_R$$
 Where:$$x_L=u_L-u_0 \\ x_R=u_R-u_0 \\ y_L=v_L-v_0$$
-$$\frac{Z}{f}=\frac{X}{x_L} \rightarrow ZxL=fX$$
-$$\frac{Z}{f}=\frac{X-b}{x_R} \rightarrow ZxR=fX-fb$$
+$$\frac{Z}{f}=\frac{X}{x_L} \rightarrow Zx_L=fX$$
+$$\frac{Z}{f}=\frac{X-b}{x_R} \rightarrow Zx_R=fX-fb$$
 $$Zx_R=Zx_L-fb$$
 $$Z=\frac{fb}{d}$$
 $$X=\frac{Zx_L}{f}$$
