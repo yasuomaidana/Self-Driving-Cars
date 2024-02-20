@@ -40,3 +40,7 @@ and return the best inlier set. Else, go back to step 2
 Final Step:
 
 1. Recompute model parameters from entire best inlier set
+
+## Additional material
+
+Forsyth, D.A. and J. Ponce (2003). Computer Vision: a modern approach (2nd edition). New Jersey: Pearson. Read section 19.1-19.3.
