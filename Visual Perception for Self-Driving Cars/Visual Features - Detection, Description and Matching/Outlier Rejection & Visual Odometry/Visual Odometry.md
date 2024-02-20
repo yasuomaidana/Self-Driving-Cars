@@ -40,7 +40,6 @@ two frames $I_{k-1}$ and $I_k$
 
 #### 3D-2D motion estimation
 
-
 ![3d-2d motion estimation](./3d-2d%20motion%20estimation.jpg)
 
 Given:
