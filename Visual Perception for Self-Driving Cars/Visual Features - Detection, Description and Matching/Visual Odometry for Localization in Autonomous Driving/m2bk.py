@@ -8,6 +8,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from mpl_toolkits.mplot3d import Axes3D
+from tqdm import tqdm
 
 
 class DatasetHandler:
@@ -28,28 +29,26 @@ class DatasetHandler:
 
         self.k = np.array([[640, 0, 640],
                            [0, 480, 480],
-                           [0,   0,   1]], dtype=np.float32)
-        
+                           [0, 0, 1]], dtype=np.float32)
 
         # Read first frame
         self.read_frame()
-        print("\r" + ' '*20 + "\r", end='')
-        
+        print("\r" + ' ' * 20 + "\r", end='')
+
     def read_frame(self):
         self._read_depth()
         self._read_image()
-              
+
     def _read_image(self):
-        for i in range(1, self.num_frames + 1):
+        for i in tqdm(range(1, self.num_frames + 1), desc="Reading images"):
             zeroes = "0" * (5 - len(str(i)))
             im_name = "{0}/frame_{1}{2}.png".format(self.image_dir, zeroes, str(i))
             self.images.append(cv.imread(im_name, flags=0))
             self.images_rgb.append(cv.imread(im_name)[:, :, ::-1])
-            print ("Data loading: {0}%".format(int((i + self.num_frames) / (self.num_frames * 2 - 1) * 100)), end="\r")
-            
-       
+            # print("Data loading: {0}%".format(int((i + self.num_frames) / (self.num_frames * 2 - 1) * 100)), end="\r")
+
     def _read_depth(self):
-        for i in range(1, self.num_frames + 1):
+        for i in tqdm(range(1, self.num_frames + 1), desc="Reading depth"):
             zeroes = "0" * (5 - len(str(i)))
             depth_name = "{0}/frame_{1}{2}.dat".format(self.depth_dir, zeroes, str(i))
             depth = np.loadtxt(
@@ -57,13 +56,13 @@ class DatasetHandler:
                 delimiter=',',
                 dtype=np.float64) * 1000.0
             self.depth_maps.append(depth)
-            print ("Data loading: {0}%".format(int(i / (self.num_frames * 2 - 1) * 100)), end="\r")
-            
-        
+            # print("Data loading: {0}%".format(int(i / (self.num_frames * 2 - 1) * 100)), end="\r")
+
+
 def visualize_camera_movement(image1, image1_points, image2, image2_points, is_show_img_after_move=False):
     image1 = image1.copy()
     image2 = image2.copy()
-    
+
     for i in range(0, len(image1_points)):
         # Coordinates of a point on t frame
         p1 = (int(image1_points[i][0]), int(image1_points[i][1]))
@@ -76,8 +75,8 @@ def visualize_camera_movement(image1, image1_points, image2, image2_points, is_s
 
         if is_show_img_after_move:
             cv.circle(image2, p2, 5, (255, 0, 0), 1)
-    
-    if is_show_img_after_move: 
+
+    if is_show_img_after_move:
         return image2
     else:
         return image1
@@ -100,7 +99,7 @@ def visualize_trajectory(trajectory):
 
     for i in range(0, trajectory.shape[1]):
         current_pos = trajectory[:, i]
-        
+
         locX.append(current_pos.item(0))
         locY.append(current_pos.item(1))
         locZ.append(current_pos.item(2))
@@ -183,7 +182,7 @@ def visualize_trajectory(trajectory):
     D3_plt.set_xlabel("X", labelpad=0)
     D3_plt.set_ylabel("Z", labelpad=0)
     D3_plt.set_zlabel("Y", labelpad=-2)
-    
+
     # plt.axis('equal')
     D3_plt.view_init(45, azim=30)
     plt.tight_layout()
