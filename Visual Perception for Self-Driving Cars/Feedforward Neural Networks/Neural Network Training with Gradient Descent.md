@@ -77,3 +77,7 @@ minibatch
 
 > ADAM: Implemented in most deep neural network libraries, fairly robust to the choice of the learning rate and other
 hyperparameters
+
+## Additional material
+
+Goodfellow, I., Bengio, Y., Courville, A., & Bengio, Y. (2016). [Deep Learning (Vol. 1)](https://www.deeplearningbook.org/). Cambridge: MIT press. Read sections 6.5, 8.1-8.5.
