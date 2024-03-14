@@ -71,8 +71,6 @@ different characteristics and behaviours
 
 ## Hierarchical Planning Introduction
 
-<img alt="Hierarchy" src="./Hierarchy.png" style="height:60vh;margin:auto;display:block"/>
-
 Driving mission and scenarios are complex problems.
 Break them into a hierarchy of optimization problems.
 
@@ -80,3 +78,5 @@ Each optimization problem tailored to the correct scope and level of abstraction
 
 Higher in the hierarchy means more abstraction.
 Each optimization problem will have constraints and objective functions
+
+<img alt="Hierarchy" src="./Hierarchy.png" style="height:60vh;margin:auto;display:block"/>
