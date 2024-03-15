@@ -2,7 +2,7 @@
 
 ## Bicycle Model
 
-![bicycle model](/bicycle%20model.jpg)
+![bicycle model](./bicycle%20model.jpg)
 
 $$\dot{\theta}=\frac{V\tan{(\delta)}}{L}$$
 $$|\kappa|\le \kappa_{\text{max}}$$
