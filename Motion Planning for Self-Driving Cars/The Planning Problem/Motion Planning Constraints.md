@@ -2,7 +2,7 @@
 
 ## Bicycle Model
 
-![bicycle model](./bicycle%20model.jpg)
+<img alt="bicycle model" src="./bicycle%20model.jpg" style="height:30vh;margin:2em auto;display:block"/>
 
 $$\dot{\theta}=\frac{V\tan{(\delta)}}{L}$$
 $$|\kappa|\le \kappa_{\text{max}}$$
@@ -21,7 +21,7 @@ $$k = \frac{1}{r} = \frac{x'y''-y'x''}{(x'^2+y'^2)^{3/2}}$$
 
 Recall: friction ellipse denotes maximum magnitude of tire forces before stability loss.
 
-![friction ellipse](./friction%20ellipse.jpg)
+<img alt="friction ellipse" src="./friction%20ellipse.jpg" style="height:50vh;margin:2em auto;display:block"/>
 
 Friction forces are extreme limit; more useful constraint is accelerations tolerable by passengers.
 
