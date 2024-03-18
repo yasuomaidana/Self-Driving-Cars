@@ -85,3 +85,83 @@ Where:
 
 * Numerically stable
 * Computationally efficient
+
+## Inverse Measurement Module
+
+$$l_{t,i}=\text{logit}(p(m^i\mid y_{t}))+l_{t-1,i}-l_{0,i}$$
+
+Remembering $p(m^i\mid y_{t})$: is the state of the occupancy grid given a measurement
+
+So far we have only seen the following measurement model:
+
+$$p(y_t\mid m^i)$$
+
+Which describe the state of the occupancy grid given a measurement
+
+Then a inverse measurement model is needed!
+
+### Inverse Measurement Module — To be improved
+
+Scanner bearing:
+
+$$\phi^s = \begin{bmatrix}-\phi_{max}^s & \dots & \phi_{max}^s\end{bmatrix} \quad \phi_j^s\in\phi^s$$
+
+Scanner ranges:
+$$r^s = \begin{bmatrix}-r_{1}^s & \dots & r_{j}^s\end{bmatrix} \quad r_j^s\in r_{max}^s$$
+
+## Inverse Measurement Module Model
+
+![inverse measurement module](./Inverse%20Measurement%20Module.jpg)
+
+![grid model](./grid%20model.jpg)
+
+![model with probabilities](./model%20with%20probabilities.jpg)
+
+![to be fixed](./to%20be%20fixed.jpg)
+
+Relative range:
+
+$$r^i=\sqrt{\left(m_x^i-x_{1,t} \right)^2+\left(m_y^i-x_{2,t} \right)}$$
+
+Relative bearing:
+$$\phi^i=\tan^{-1}\left(\frac{m_y^i-x_{2,t}}{m_x^i-x_{1,t}}\right)-x_{3,t}$$
+
+Closest relative bearing:
+
+$$k=\argmin\left(|\phi^i-\phi_{j}^s|\right)$$
+
+![inverse model](./inverse%20model.jpg)
+
+$\alpha$: defines the affected range for high probability
+
+$\beta$: defines the affected angle for low and high probability
+
+### Algorithm
+
+* No information $$\text{if }r^i>\min\left(r_{max}^s\right) \quad \text{or} \quad |\phi^i-\phi_k^s|>\beta/2$$
+* High probability $$\text{if }r_k^s<r_{max}^s \quad \text{and} \quad |r^i-r_k^s|>\alpha/2$$
+* Low probability: $$\text{if }r_k^s<r_{max}^s$$
+
+$$\begin{cases} \text{No information} & r^i>\min\left(r_{max}^s\right) \quad \text{or} \quad |\phi^i-\phi_k^s|>\beta/2\\
+\text{High probability} & r_k^s<r_{max}^s \quad \text{and} \quad |r^i-r_k^s|>\alpha/2 \\
+\text{Low probability} & r_k^s<r_{max}^s
+\end{cases}$$
+
+#### Example
+
+![example](./example.jpg)
+
+Example — red cells denote high probability of occupied, given measurement denoted by red x.
+
+## Inverse Measurement Module With Ray Tracing
+
+Ray tracing algorithm using Bresenham's line algorithm:
+
+* Rasterized line algorithm
+* Uses very cheap fixed point operations for
+fast calculations
+
+Perform update on each beam from the LIDAR rather then each cell on the grid
+
+* Preforms far fewer updates (ignores no information zone)
+* Much cheaper per operation
