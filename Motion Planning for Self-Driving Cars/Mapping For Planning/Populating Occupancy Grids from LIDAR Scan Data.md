@@ -121,7 +121,7 @@ $$r^s = \begin{bmatrix}-r_{1}^s & \dots & r_{j}^s\end{bmatrix} \quad r_j^s\in r_
 
 Relative range:
 
-$$r^i=\sqrt{\left(m_x^i-x_{1,t} \right)^2+\left(m_y^i-x_{2,t} \right)}$$
+$$r^i=\sqrt{\left(m_x^i-x_{1,t} \right)^2+\left(m_y^i-x_{2,t} \right)^2}$$
 
 Relative bearing:
 $$\phi^i=\tan^{-1}\left(\frac{m_y^i-x_{2,t}}{m_x^i-x_{1,t}}\right)-x_{3,t}$$
