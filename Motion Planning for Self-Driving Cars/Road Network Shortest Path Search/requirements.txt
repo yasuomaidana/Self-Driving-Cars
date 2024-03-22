@@ -1,0 +1,4 @@
+ipykernel
+osmnx
+scikit-learn
+matplotlib
