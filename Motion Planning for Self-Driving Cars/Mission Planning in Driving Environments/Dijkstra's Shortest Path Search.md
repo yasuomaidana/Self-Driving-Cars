@@ -7,7 +7,7 @@
 3. predecessors $\leftarrow$ Dict()
 4. open.push($s$,0)
 5. **while** !open.isEmpty() **do**
-6. &emsp; $u, uCost$ $\leftarrow$ open. pop()
+6. &emsp; $u, uCost$ $\leftarrow$ open.pop()
 7. &emsp; **if** isGoal($u$) **then**
 8. &emsp; &emsp; return extractPath($u$, predecessors)
 9. &emsp; **for all** $v \in u$.successors()
@@ -20,7 +20,7 @@
 16. &emsp; &emsp; &emsp; &emsp; predecessors[$v$] $\leftarrow u$
 17. &emsp; &emsp; else
 18. &emsp; &emsp; &emsp; open. push($v, uCost + uvCost$)
-19. &emsp; &emsp; predecessors[$v$] $\leftarrow u$
+19. &emsp; &emsp; &emsp; predecessors[$v$] $\leftarrow u$
 20. &emsp; closed. add($u$)
 
 ## Heap Data Structure
