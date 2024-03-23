@@ -34,7 +34,7 @@ $$h(v)= \lVert t-v\rVert$$
 16. &emsp; &emsp; &emsp; &emsp; costs[$v$] $\leftarrow uCost + uvCost$
 17. &emsp; &emsp; &emsp; &emsp; predecessors[$v$] $\leftarrow u$
 18. &emsp; &emsp; else
-19. &emsp; &emsp; &emsp; open. push($v, uCost + uvCost$)
+19. &emsp; &emsp; &emsp; open.push($v, uCost + uvCost+h(v)$)
 20. &emsp; &emsp; &emsp; costs[$v$] $\leftarrow uCost + uvCost$
 21. &emsp; &emsp; &emsp; predecessors[$v$] $\leftarrow u$
 22. &emsp; closed. add($u$)
