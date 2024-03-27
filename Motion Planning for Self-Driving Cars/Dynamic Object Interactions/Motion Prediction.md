@@ -1,9 +1,9 @@
 # Motion Prediction
 
-Motion prediction of the dynamic object's attempts t* estimate the future position, heading and velocity
+Motion prediction of the dynamic object's attempts to estimate the future position, heading and velocity
 Important as it allows:
 
-* Planning a set of maneuvers t* correctly interact with dynamic objects
+* Planning a set of maneuvers to correctly interact with dynamic objects
 * Avoid collisions on a planned trajectory
 
 ## Requirements for Motion Prediction Models
