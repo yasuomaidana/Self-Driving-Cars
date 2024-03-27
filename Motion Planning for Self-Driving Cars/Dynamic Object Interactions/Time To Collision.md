@@ -57,7 +57,7 @@ time to collision
 
 1. $t \leftarrow 0$
 2. $x_0 = x_\text{obj}$
-3. **while** %t < T% **do**
+3. **while** $t < T$ **do**
 4. &emsp; $t = t + dt$
 5. &emsp; **for** $i \in \{1,\dots,D\}$ **do**
 6. &emsp;&emsp; $d_i.x_t \leftarrow \text{PositionEstimation}(d_i, t)$
