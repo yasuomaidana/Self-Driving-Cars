@@ -35,7 +35,7 @@ Planned path must be safe and efficient
 * Mission path
 * Localization information
 
-### Perception Information:
+### Perception Information
 
 * All observed dynamic objects
   * Prediction of future movement
