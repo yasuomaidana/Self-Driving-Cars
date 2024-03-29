@@ -46,7 +46,7 @@ Planned path must be safe and efficient
 
 ## Finite State Machines
 
-![finite state machine](./Finite%20State%20Machines.jpg)
+<img alt="finite state machine" src="./Finite%20State%20Machines.jpg" style="height:50vh;margin: 1em auto; display:block;"/>
 
 * Each state is a driving maneuver
 * Transitions define movement from one maneuver to another

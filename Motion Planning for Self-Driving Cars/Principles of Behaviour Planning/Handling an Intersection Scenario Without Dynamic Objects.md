@@ -3,7 +3,7 @@
 Scenario Evaluation
 
 * 4 way Intersection
-* TWO lane
+* Two lane
 * Stop Sign for every direction
 * Be able to travel:
   * Through the intersection
@@ -13,7 +13,7 @@ Scenario Evaluation
 
 ## Discretizing the Intersection
 
-![intersections](./Intersections.jpg)
+<img alt="intersections" src="./Intersections.jpg" style="height:40vh;margin: 1em auto; display:block;"/>
 
 * Approaching an intersection <span style="color:red">**&#9974;**</span>.
 * At an intersection <span style="color:green">**&#9974;**</span>.
@@ -24,7 +24,7 @@ Scenario Evaluation
 
 ## State Machine States
 
-![finite states](./Finite%20States.jpg)
+<img alt="finite states" src="./Finite States.jpg" style="height:50vh;margin: 1em auto; display:block;"/>
 
 * Track Speed — Follow the current speed limit
 * Decelerate to Stop — Stop to a particular point
