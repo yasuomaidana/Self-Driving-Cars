@@ -9,7 +9,7 @@ Scenario Evaluation
   * Through the intersection
   * Left at the intersection
   * Right at the intersection
-* Interactions **with** vehicles as dynamic objects
+* Interactions **with vehicles** as dynamic objects
 
 ## Discretizing the Intersection
 
