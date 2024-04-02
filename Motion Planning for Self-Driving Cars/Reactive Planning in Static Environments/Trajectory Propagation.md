@@ -30,8 +30,8 @@ Discretization of differential equations allows for efficient computation of tra
 
 Recursive definition saves computation time
 
-$$x_n=\sum_{i=0}^{n-1}v_i\cos\left(\theta_i\right)\Delta t= x_{n-1} + v_{n-1} \cos\left(\theta_i\right)\Delta t$$
-$$y_n=\sum_{i=0}^{n-1}v_i\sin\left(\theta_i\right)\Delta t= y_{n-1} + v_{n-1} \sin\left(\theta_i\right)\Delta t$$
+$$x_n=\sum_{i=0}^{n-1}v_i\cos\left(\theta_i\right)\Delta t= x_{n-1} + v_{n-1} \cos\left(\theta_{n-1}\right)\Delta t$$
+$$y_n=\sum_{i=0}^{n-1}v_i\sin\left(\theta_i\right)\Delta t= y_{n-1} + v_{n-1} \sin\left(\theta_{n-1}\right)\Delta t$$
 $$\theta_n = \sum_{i=0}^{n-1}\frac{v_i\tan\left(\delta_i\right)}{L} \Delta t = \theta_{n-1} + \frac{v_i\tan\left(\delta_{n-1}\right)}{L} \Delta t $$
 
 ## Constant Velocity and Steering Angle Example
