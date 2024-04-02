@@ -36,3 +36,36 @@ $$x_i=\frac{x(p)+\frac{X}{2}}{\delta}\\
 y_i=\frac{y(p)+\frac{Y}{2}}{\delta}$$
 
 $$S=S\cup\left(x_i,y_i\right)$$
+
+## Lattice Planner Swaths
+
+* Swath based methods are useful for lattice planners, as the swath sets can be computed offline
+* Online collision checking is then simplified using lookup tables
+
+### Speed and Robustness
+
+* Need to improve speed
+* Need to be robust to noise
+* Use conservative approximations to solve both of these problems
+* Want algorithmic speedup without sacrificing path quality
+
+## Conservative Approximations
+
+<img alt="Second state" src="./Conservative Circle Model.jpg" style="height:30vh;margin: 1em auto; display:block;"/>
+
+* Conservative approximations may report a collision even if there isn't one, but will never miss a collision if it
+were to actually happen
+* The car can be completely encapsulated by three circles
+
+## Circle Collision Checking
+
+* Circle approximation is effective because it is fast to check if an occupancy grid point lies within a circle of radius $r$ centered at $(x_c,y_c)$
+* If obstacle in occupancy grid lies within circle, a collision is reported
+$$\lVert (x_i,y_i) -(x_c,y_c)\rVert \leq r$$
+* Otherwise, due to conservative approximation, no collision is possible
+$$\lVert (x_i,y_i) -(x_c,y_c)\rVert > r$$
+
+## Discretization Resolution
+
+* Collision checking accuracy is impacted by the resolution of our discretization
+* Higher fidelity collision checking requires a finer resolution for occupancy grids and path points, and will require more computational resources
