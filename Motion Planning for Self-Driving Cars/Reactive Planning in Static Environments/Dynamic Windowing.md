@@ -23,7 +23,7 @@ v_{\min} \leq v \leq v_{\max}$$
 
 $$\ddot{\theta}_\text{min} \leq\ddot{\theta}\leq \ddot{\theta}_\text{max}$$
 $$\ddot{x}_\text{min} \leq\ddot{x}\leq \ddot{x}_\text{max}$$
-$$\ddot{y}_\text{min} \leq\ddot{y}\leq \ddot{y}_\text{max}$$
+<!-- $$\ddot{y}_\text{min} \leq\ddot{y}\leq \ddot{y}_\text{max}$$ -->
 
 ## Constraint in Terms of Steering Angle
 
