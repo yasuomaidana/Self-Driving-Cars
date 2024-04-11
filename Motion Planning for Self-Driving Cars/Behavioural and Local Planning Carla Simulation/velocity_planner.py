@@ -526,9 +526,7 @@ def calc_final_speed(v_i, a, d):
     """
     pass
 
-    # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
     # ------------------------------------------------------------------
-    # v_f = ...
-    # return v_f
+    v_f = sqrt(2*a*d+v_i**2) if 2*a*d+v_i**2 > 0 else 0
+    return v_f
     # ------------------------------------------------------------------
-
