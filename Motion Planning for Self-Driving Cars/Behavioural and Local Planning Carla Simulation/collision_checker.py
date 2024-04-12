@@ -56,7 +56,7 @@ class CollisionChecker:
         collision_check_array = np.zeros(len(paths), dtype=bool)
         for i in range(len(paths)):
             collision_free = True
-            path           = paths[i]
+            path = paths[i]
 
             # Iterate over the points in the path.
             for j in range(len(path[0])):
@@ -80,10 +80,11 @@ class CollisionChecker:
                 # path[1][j]. 
                 circle_locations = np.zeros((len(self._circle_offsets), 2))
 
-                # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
                 # --------------------------------------------------------------
-                # circle_locations[:, 0] = ... 
-                # circle_locations[:, 1] = ...
+                circle_locations[:, 0] = ([circle_offset*int(cos(path[2][j])) for circle_offset in self._circle_offsets]
+                                          + path[0][j])
+                circle_locations[:, 1] = ([circle_offset*int(sin(path[2][j])) for circle_offset in self._circle_offsets]
+                                          + path[1][j])
                 # --------------------------------------------------------------
 
                 # Assumes each obstacle is approximated by a collection of
