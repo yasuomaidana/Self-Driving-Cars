@@ -11,11 +11,12 @@ import numpy as np
 import scipy.spatial
 from math import sin, cos, pi, sqrt
 
+
 class CollisionChecker:
     def __init__(self, circle_offsets, circle_radii, weight):
         self._circle_offsets = circle_offsets
-        self._circle_radii   = circle_radii
-        self._weight         = weight
+        self._circle_radii = circle_radii
+        self._weight = weight
 
     ######################################################
     ######################################################
@@ -81,10 +82,12 @@ class CollisionChecker:
                 circle_locations = np.zeros((len(self._circle_offsets), 2))
 
                 # --------------------------------------------------------------
-                circle_locations[:, 0] = ([circle_offset*int(cos(path[2][j])) for circle_offset in self._circle_offsets]
-                                          + path[0][j])
-                circle_locations[:, 1] = ([circle_offset*int(sin(path[2][j])) for circle_offset in self._circle_offsets]
-                                          + path[1][j])
+                circle_locations[:, 0] = (
+                        [circle_offset * int(cos(path[2][j])) for circle_offset in self._circle_offsets]
+                        + path[0][j])
+                circle_locations[:, 1] = (
+                        [circle_offset * int(sin(path[2][j])) for circle_offset in self._circle_offsets]
+                        + path[1][j])
                 # --------------------------------------------------------------
 
                 # Assumes each obstacle is approximated by a collection of
@@ -95,9 +98,9 @@ class CollisionChecker:
                 # the collision_free flag should be set to false for this flag
                 for k in range(len(obstacles)):
                     collision_dists = \
-                        scipy.spatial.distance.cdist(obstacles[k], 
+                        scipy.spatial.distance.cdist(obstacles[k],
                                                      circle_locations)
-                    collision_dists = np.subtract(collision_dists, 
+                    collision_dists = np.subtract(collision_dists,
                                                   self._circle_radii)
                     collision_free = collision_free and \
                                      not np.any(collision_dists < 0)
@@ -163,7 +166,6 @@ class CollisionChecker:
                 # The centerline goal is given by goal_state.
                 # The exact choice of objective function is up to you.
                 # A lower score implies a more suitable path.
-                # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
                 # --------------------------------------------------------------
                 score = np.linalg.norm(goal_state - paths[i][0:2][-1])
                 # --------------------------------------------------------------
@@ -176,18 +178,16 @@ class CollisionChecker:
                         continue
                     else:
                         if not collision_check_array[j]:
-                            # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
+                            # TODO: Evaluate different functions
                             # --------------------------------------------------
                             proximity = np.linalg.norm(paths[i][0:2][-1] - paths[j][0:2][-1])
                             score += self._weight * np.exp(-proximity)
                             # --------------------------------------------------
 
-                            pass
-
             # Handle the case of colliding paths.
             else:
                 score = float('Inf')
-                
+
             # Set the best index to be the path index with the lowest score
             if score < best_score:
                 best_score = score
