@@ -179,6 +179,7 @@ class CollisionChecker:
                             # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
                             # --------------------------------------------------
                             # score += self._weight * ...
+                            proximity = np.linalg.norm(paths[i][0:2][-1] - paths[j][0:2][-1])
                             # --------------------------------------------------
 
                             pass
