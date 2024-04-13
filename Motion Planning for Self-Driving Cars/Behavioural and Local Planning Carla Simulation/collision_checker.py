@@ -165,7 +165,7 @@ class CollisionChecker:
                 # A lower score implies a more suitable path.
                 # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
                 # --------------------------------------------------------------
-                # score = ...
+                score = np.linalg.norm(goal_state - paths[i][0:2][-1])
                 # --------------------------------------------------------------
 
                 # Compute the "proximity to other colliding paths" score and
