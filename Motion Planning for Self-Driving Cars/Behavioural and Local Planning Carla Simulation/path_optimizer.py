@@ -10,7 +10,9 @@
 import numpy as np
 import scipy.optimize
 import scipy.integrate
-from math import sin, cos, pi, sqrt
+from numpy import inf, array, polyval, sin, cos
+from scipy.optimize import Bounds
+
 
 class PathOptimizer:
     def __init__(self):
