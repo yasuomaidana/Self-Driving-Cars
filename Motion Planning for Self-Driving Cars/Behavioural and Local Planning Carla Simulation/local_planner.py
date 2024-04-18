@@ -111,10 +111,11 @@ class LocalPlanner:
         #                                             sin(theta)  cos(theta)]
         # and that we are rotating by -ego_state[2] to ensure the ego vehicle's
         # current yaw corresponds to theta = 0 in the new local frame.
-        # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
         # ------------------------------------------------------------------
-        # goal_x = ...
-        # goal_y = ...
+        theta = -ego_state[2]
+        rotation_matrix = np.array([[cos(theta), -sin(-theta)],
+                                    [sin(theta), cos(-theta)]])
+        goal_x, goal_y = np.matmul(rotation_matrix, goal_state_local[:2])
         # ------------------------------------------------------------------
 
         # Compute the goal yaw in the local frame by subtracting off the 
