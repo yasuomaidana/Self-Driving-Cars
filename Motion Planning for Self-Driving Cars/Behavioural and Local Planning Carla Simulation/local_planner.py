@@ -85,15 +85,12 @@ class LocalPlanner:
         # If the goal index is the last in the set of waypoints, use
         # the previous index instead.
         # To do this, compute the delta_x and delta_y values between
-        # consecutive waypoints, then use the np.arctan2() function.
-        # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
+        # consecutive waypoints, then use the np.arctan2() function
         # ------------------------------------------------------------------
-        # if ...
-        # delta_x = ...
-        # delta_y = ...
-        # else: ...
-        # ...
-        # heading = ...
+        goal_index = goal_index if goal_index != len(waypoints) - 1 else goal_index - 1
+        delta_x = waypoints[goal_index + 1][0] - waypoints[goal_index][0]
+        delta_y = waypoints[goal_index + 1][1] - waypoints[goal_index][1]
+        heading = arctan2(delta_y, delta_x)
         # ------------------------------------------------------------------
 
         # Compute the center goal state in the local frame using 
