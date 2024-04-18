@@ -9,10 +9,12 @@
 
 import numpy as np
 import copy
-import path_optimizer
+
+from numpy import arctan2, sin, cos, pi
+
 import collision_checker
 import velocity_planner
-from math import sin, cos, pi, sqrt
+from path_optimizer import PathOptimizer
 
 
 class LocalPlanner:
@@ -21,7 +23,7 @@ class LocalPlanner:
                  stop_line_buffer):
         self._num_paths = num_paths
         self._path_offset = path_offset
-        self._path_optimizer = path_optimizer.PathOptimizer()
+        self._path_optimizer = PathOptimizer()
         self._collision_checker = \
             collision_checker.CollisionChecker(circle_offsets,
                                                circle_radii,
@@ -120,9 +122,8 @@ class LocalPlanner:
 
         # Compute the goal yaw in the local frame by subtracting off the 
         # current ego yaw from the heading variable.
-        # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
         # ------------------------------------------------------------------
-        # goal_t = ...
+        goal_t = heading - ego_state[2]
         # ------------------------------------------------------------------
 
         # Velocity is preserved after the transformation.
@@ -135,7 +136,7 @@ class LocalPlanner:
             goal_t += 2 * pi
 
         # Compute and apply the offset for each path such that
-        # all of the paths have the same heading of the goal state, 
+        # all the paths have the same heading of the goal state,
         # but are laterally offset with respect to the goal heading.
         goal_state_set = []
         for i in range(self._num_paths):
@@ -145,7 +146,7 @@ class LocalPlanner:
             offset = (i - self._num_paths // 2) * self._path_offset
 
             # Compute the projection of the lateral offset along the x
-            # and y axis. To do this, multiply the offset by cos(goal_theta + pi/2)
+            # and y-axis. To do this, multiply the offset by cos(goal_theta + pi/2)
             # and sin(goal_theta + pi/2), respectively.
             # ------------------------------------------------------------------
             x_offset = offset * cos(goal_t + pi / 2)
@@ -159,8 +160,7 @@ class LocalPlanner:
 
         return goal_state_set
 
-        # Plans the path set using polynomial spiral optimization to
-
+    # Plans the path set using polynomial spiral optimization to
     # each of the goal states.
     def plan_paths(self, goal_state_set):
         """Plans the path set using the polynomial spiral optimization.
@@ -214,7 +214,7 @@ class LocalPlanner:
 
 
 def transform_paths(paths, ego_state):
-    """ Converts the to the global coordinate frame.
+    """ Converts to the global coordinate frame.
 
     Converts the paths from the local (vehicle) coordinate frame to the
     global coordinate frame.
@@ -251,9 +251,9 @@ def transform_paths(paths, ego_state):
         t_transformed = []
 
         for i in range(len(path[0])):
-            x_transformed.append(ego_state[0] + path[0][i] * cos(ego_state[2]) - \
+            x_transformed.append(ego_state[0] + path[0][i] * cos(ego_state[2]) -
                                  path[1][i] * sin(ego_state[2]))
-            y_transformed.append(ego_state[1] + path[0][i] * sin(ego_state[2]) + \
+            y_transformed.append(ego_state[1] + path[0][i] * sin(ego_state[2]) +
                                  path[1][i] * cos(ego_state[2]))
             t_transformed.append(path[2][i] + ego_state[2])
 
