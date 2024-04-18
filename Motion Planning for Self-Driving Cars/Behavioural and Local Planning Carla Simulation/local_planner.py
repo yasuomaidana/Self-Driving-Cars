@@ -147,10 +147,9 @@ class LocalPlanner:
             # Compute the projection of the lateral offset along the x
             # and y axis. To do this, multiply the offset by cos(goal_theta + pi/2)
             # and sin(goal_theta + pi/2), respectively.
-            # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
             # ------------------------------------------------------------------
-            # x_offset = ...
-            # y_offset = ...
+            x_offset = offset * cos(goal_t + pi / 2)
+            y_offset = offset * sin(goal_t + pi / 2)
             # ------------------------------------------------------------------
 
             goal_state_set.append([goal_x + x_offset,
