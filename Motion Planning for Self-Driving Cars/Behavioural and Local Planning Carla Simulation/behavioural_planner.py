@@ -243,13 +243,15 @@ class BehaviouralPlanner:
             return wp_index
 
         # Otherwise, find our next waypoint.
-        # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
         # ------------------------------------------------------------------
-        # while wp_index < len(waypoints) - 1:
-        #   arc_length += ...
+        while wp_index < len(waypoints) - 1:
+            wp_index += 1
+            arc_length += np.linalg.norm(waypoints[wp_index][0:2] - waypoints[wp_index - 1][0:2])
+            if arc_length >= self._lookahead:
+                return wp_index
         # ------------------------------------------------------------------
 
-        return wp_index
+        return len(waypoints) - 1
 
     # Checks the given segment of the waypoint list to see if it
     # intersects with a stop line. If any index does, return the
