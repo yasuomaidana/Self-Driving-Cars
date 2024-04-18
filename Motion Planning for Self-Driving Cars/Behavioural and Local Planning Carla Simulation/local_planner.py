@@ -101,10 +101,9 @@ class LocalPlanner:
 
         # Translate so the ego state is at the origin in the new frame.
         # This is done by subtracting the ego_state from the goal_state_local.
-        # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
         # ------------------------------------------------------------------
-        # goal_state_local[0] -= ... 
-        # goal_state_local[1] -= ... 
+        goal_state_local[0] -= ego_state[0]
+        goal_state_local[1] -= ego_state[1]
         # ------------------------------------------------------------------
 
         # Rotate such that the ego state has zero heading in the new frame.
