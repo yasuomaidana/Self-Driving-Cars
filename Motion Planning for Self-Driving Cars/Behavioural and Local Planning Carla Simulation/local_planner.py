@@ -115,8 +115,8 @@ class LocalPlanner:
         # current yaw corresponds to theta = 0 in the new local frame.
         # ------------------------------------------------------------------
         theta = -ego_state[2]
-        rotation_matrix = np.array([[cos(theta), -sin(-theta)],
-                                    [sin(theta), cos(-theta)]])
+        rotation_matrix = np.array([[cos(theta), -sin(theta)],
+                                    [sin(theta), cos(theta)]])
         goal_x, goal_y = np.matmul(rotation_matrix, goal_state_local[:2])
         # ------------------------------------------------------------------
 
