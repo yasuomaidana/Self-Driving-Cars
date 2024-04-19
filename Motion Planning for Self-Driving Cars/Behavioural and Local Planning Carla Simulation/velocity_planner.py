@@ -8,7 +8,7 @@
 # Date: October 29, 2018
 
 import numpy as np
-from math import sin, cos, pi, sqrt
+from numpy import sqrt
 
 
 class VelocityPlanner:
@@ -57,8 +57,7 @@ class VelocityPlanner:
 
     ######################################################
     ######################################################
-    # MODULE 7: COMPUTE VELOCITY PROFILE
-    #   Read over the function comments to familiarize yourself with the
+    # COMPUTE VELOCITY PROFILE
     ######################################################
     ######################################################
     # Takes a path, and computes a velocity profile to our desired speed.
@@ -497,7 +496,6 @@ def calc_distance(v_i, v_f, a):
     """
 
     # ------------------------------------------------------------------
-    # d = ...
     d = (v_f ** 2 - v_i ** 2) / (2 * a)
     return d
     # ------------------------------------------------------------------
@@ -505,10 +503,7 @@ def calc_distance(v_i, v_f, a):
 
 ######################################################
 ######################################################
-# MODULE 7: COMPUTE FINAL SPEED WITH CONSTANT ACCELERATION
-#   Read over the function comments to familiarize yourself with the
-#   arguments and necessary variables to return. Then follow the TODOs
-#   (top-down) and use the surrounding comments as a guide.
+# COMPUTE FINAL SPEED WITH CONSTANT ACCELERATION
 ######################################################
 ######################################################
 # Using v_f = sqrt(v_i^2 + 2ad), compute the final speed for a given
@@ -526,9 +521,7 @@ def calc_final_speed(v_i, a, d):
     returns:
         v_f: the final speed (m/s)
     """
-    pass
-
     # ------------------------------------------------------------------
-    v_f = sqrt(2*a*d+v_i**2) if 2*a*d+v_i**2 > 0 else 0
+    v_f = sqrt(max(2 * a * d + v_i ** 2, 0))
     return v_f
     # ------------------------------------------------------------------
