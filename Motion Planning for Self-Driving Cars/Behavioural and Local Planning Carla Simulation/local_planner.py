@@ -89,9 +89,12 @@ class LocalPlanner:
         # To do this, compute the delta_x and delta_y values between
         # consecutive waypoints, then use the np.arctan2() function
         # ------------------------------------------------------------------
-        goal_index = goal_index if goal_index != len(waypoints) - 1 else goal_index - 1
-        delta_x = waypoints[goal_index + 1][0] - waypoints[goal_index][0]
-        delta_y = waypoints[goal_index + 1][1] - waypoints[goal_index][1]
+        if goal_index < len(waypoints) - 1:
+            delta_x = waypoints[goal_index + 1][0] - waypoints[goal_index][0]
+            delta_y = waypoints[goal_index + 1][1] - waypoints[goal_index][1]
+        else:
+            delta_x = waypoints[goal_index][0] - waypoints[goal_index-1][0]
+            delta_y = waypoints[goal_index][1] - waypoints[goal_index-1][1]
         heading = arctan2(delta_y, delta_x)
         # ------------------------------------------------------------------
 
