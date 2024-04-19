@@ -6,6 +6,8 @@
 import numpy as np
 import math
 
+from numpy import array
+
 # State machine states
 FOLLOW_LANE = 0
 DECELERATE_TO_STOP = 1
@@ -39,7 +41,7 @@ class BehaviouralPlanner:
     ######################################################
     ######################################################
     # Handles state transitions and computes the goal state.
-    def transition_state(self, waypoints, ego_state, closed_loop_speed):
+    def transition_state(self, waypoints: array, ego_state: array, closed_loop_speed):
         """Handles state transitions and computes the goal state.  
         
         args:
@@ -107,7 +109,8 @@ class BehaviouralPlanner:
             # ------------------------------------------------------------------
             goal_index, stop_sign_found = self.check_for_stop_signs(waypoints, closest_index, goal_index)
             self._goal_index = goal_index
-            self._goal_state = waypoints[goal_index]
+            self._goal_state = waypoints[self._goal_index]
+
             # ------------------------------------------------------------------
 
             # If stop sign found, set the goal to zero speed, then transition to 
@@ -127,7 +130,6 @@ class BehaviouralPlanner:
             # ------------------------------------------------------------------
             if closed_loop_speed < STOP_THRESHOLD:
                 self._state = STAY_STOPPED
-                self._stop_count = 0
             # ------------------------------------------------------------------
             pass
 
@@ -140,7 +142,7 @@ class BehaviouralPlanner:
             # passed the stop sign, return to lane following.
             # You should use the get_closest_index(), get_goal_index(), and 
             # check_for_stop_signs() helper functions.
-            if self._stop_count == STOP_COUNTS:
+            if self._stop_count >= STOP_COUNTS:
                 # --------------------------------------------------------------
                 closest_len, closest_index = get_closest_index(waypoints, ego_state)
                 goal_index = self.get_goal_index(waypoints, ego_state, closest_len, closest_index)
@@ -151,7 +153,7 @@ class BehaviouralPlanner:
                 # that is the lookahead distance away.
                 # --------------------------------------------------------------
                 self._goal_index = goal_index
-                self._goal_state = waypoints[goal_index]
+                self._goal_state = waypoints[self._goal_index]
                 stop_sign_found = self.check_for_stop_signs(waypoints, closest_index, goal_index)[1]
                 # --------------------------------------------------------------
                 # If the stop sign is no longer along our path, we can now
@@ -159,6 +161,7 @@ class BehaviouralPlanner:
                 # --------------------------------------------------------------
                 if not stop_sign_found:
                     self._state = FOLLOW_LANE
+                    self._stop_count = 0
                 # --------------------------------------------------------------
                 pass
 
@@ -390,7 +393,7 @@ class BehaviouralPlanner:
 ######################################################
 # Compute the waypoint index that is closest to the ego vehicle, and return
 # it as well as the distance from the ego vehicle to that waypoint.
-def get_closest_index(waypoints, ego_state):
+def get_closest_index(waypoints: array, ego_state: array):
     """Gets closest index a given list of waypoints to the vehicle position.
 
     args:
