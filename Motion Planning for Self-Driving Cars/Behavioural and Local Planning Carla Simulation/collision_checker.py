@@ -9,7 +9,8 @@
 
 import numpy as np
 import scipy.spatial
-from math import sin, cos, pi, sqrt
+
+from numpy import array, sin, cos
 
 
 class CollisionChecker:
@@ -82,12 +83,12 @@ class CollisionChecker:
                 circle_locations = np.zeros((len(self._circle_offsets), 2))
 
                 # --------------------------------------------------------------
-                circle_locations[:, 0] = (
-                        [circle_offset * int(cos(path[2][j])) for circle_offset in self._circle_offsets]
-                        + path[0][j])
-                circle_locations[:, 1] = (
-                        [circle_offset * int(sin(path[2][j])) for circle_offset in self._circle_offsets]
-                        + path[1][j])
+                circle_locations[:, 0] = [circle_offset * cos(path[2][j])
+                                          for circle_offset in self._circle_offsets]
+                circle_locations[:, 1] = [circle_offset * sin(path[2][j]) for
+                                          circle_offset in self._circle_offsets]
+                circle_locations[:, 0] += path[0][j]
+                circle_locations[:, 1] += path[1][j]
                 # --------------------------------------------------------------
 
                 # Assumes each obstacle is approximated by a collection of
@@ -102,8 +103,7 @@ class CollisionChecker:
                                                      circle_locations)
                     collision_dists = np.subtract(collision_dists,
                                                   self._circle_radii)
-                    collision_free = collision_free and \
-                                     not np.any(collision_dists < 0)
+                    collision_free = collision_free and not np.any(collision_dists < 0)
 
                     if not collision_free:
                         break
@@ -167,7 +167,8 @@ class CollisionChecker:
                 # The exact choice of objective function is up to you.
                 # A lower score implies a more suitable path.
                 # --------------------------------------------------------------
-                score = np.linalg.norm(goal_state - paths[i][0:2][-1])
+                path = array([paths[i][0][-1], paths[i][1][-1]])
+                score = np.linalg.norm(goal_state[0:2] - path)
                 # --------------------------------------------------------------
 
                 # Compute the "proximity to other colliding paths" score and
@@ -178,10 +179,12 @@ class CollisionChecker:
                         continue
                     else:
                         if not collision_check_array[j]:
-                            # TODO: Evaluate different functions
                             # --------------------------------------------------
-                            proximity = np.linalg.norm(paths[i][0:2][-1] - paths[j][0:2][-1])
-                            score += self._weight * np.exp(-proximity)
+                            path_i = array([paths[i][0][-1], paths[i][1][-1]])
+                            path_j = array([paths[j][0][-1], paths[j][1][-1]])
+                            proximity = np.linalg.norm(path_i - path_j)
+                            # score += 1 / (self._weight*proximity)
+                            score += (1 / (1-np.exp(-4*self._weight * proximity**2))-1)
                             # --------------------------------------------------
 
             # Handle the case of colliding paths.
