@@ -201,6 +201,14 @@ class Controller2D(object):
                               crosstrack_error / \
                               (v + self.vars.k_speed_crosstrack))
 
+            if throttle_output < -0.05 and v_desired == 0:
+                brake_output = (1 - np.exp(-throttle_output ** 2 / 100))
+                brake_output *= (1 - np.exp(-v_error_rate_of_change ** 2 / 50))
+            elif throttle_output < 0 and v_desired/v < -1.5:
+                brake_output = (1 - np.exp(-throttle_output ** 2 / 100))
+            elif throttle_output < 0 and v_desired/v < -2:
+                brake_output = 1
+
             ######################################################
             # SET CONTROLS OUTPUT
             ######################################################
