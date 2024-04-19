@@ -34,10 +34,7 @@ class LocalPlanner:
 
     ######################################################
     ######################################################
-    # MODULE 7: GOAL STATE COMPUTATION
-    #   Read over the function comments to familiarize yourself with the
-    #   arguments and necessary variables to return. Then follow the TODOs
-    #   (top-down) and use the surrounding comments as a guide.
+    # Goal state ComputationGOAL STATE COMPUTATION
     ######################################################
     ######################################################
     # Computes the goal state set from a given goal position. This is done by
