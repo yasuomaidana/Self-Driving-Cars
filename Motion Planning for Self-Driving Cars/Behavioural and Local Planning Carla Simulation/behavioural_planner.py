@@ -421,7 +421,8 @@ def get_closest_index(waypoints, ego_state):
                 i.e. waypoints[closest_index] gives the waypoint closest to the vehicle.
     """
     # ------------------------------------------------------------------
-    distances = np.linalg.norm(ego_state[0:2] - waypoints[:, 0:2], axis=1)
+    waypoints_ = waypoints if isinstance(waypoints, np.ndarray) else array(waypoints)
+    distances = np.linalg.norm(ego_state[0:2] - waypoints_[:, 0:2], axis=1)
     closest_index = np.argmin(distances)
     closest_len = distances[closest_index]
     # ------------------------------------------------------------------
