@@ -234,14 +234,13 @@ class BehaviouralPlanner:
 
         # Otherwise, find our next waypoint.
         # ------------------------------------------------------------------
-        while wp_index < len(waypoints) - 1:
+        waypoints_ = np.array(waypoints)
+        while wp_index < len(waypoints) - 1 and arc_length < self._lookahead:
             wp_index += 1
-            arc_length += np.linalg.norm(waypoints[wp_index][0:2] - waypoints[wp_index - 1][0:2])
-            if arc_length >= self._lookahead:
-                return wp_index
+            arc_length += np.linalg.norm(waypoints_[wp_index][0:2] - waypoints_[wp_index - 1][0:2])
         # ------------------------------------------------------------------
 
-        return len(waypoints) - 1
+        return wp_index
 
     # Checks the given segment of the waypoint list to see if it
     # intersects with a stop line. If any index does, return the
