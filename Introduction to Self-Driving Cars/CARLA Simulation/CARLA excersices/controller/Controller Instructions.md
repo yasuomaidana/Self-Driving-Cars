@@ -51,13 +51,13 @@ In one terminal, start the CARLA simulator at a 30hz fixed time-step:
 
 * Ubuntu
 
-    ```
+    ```cmd
     ./CarlaUE4.sh /Game/Maps/RaceTrack -windowed -carla-server -benchmark -fps=30
     ```
 
 * Windows
 
-    ```
+    ```cmd
     CarlaUE4.exe /Game/Maps/RaceTrack -windowed -carla-server -benchmark -fps=30
     ```
 
