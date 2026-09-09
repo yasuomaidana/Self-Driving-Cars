@@ -6,7 +6,7 @@ The Kalman Filter requires the following motion and measurement models:
 
 * Motion Model: $$\bm{x}_k=\bm{F}_{k-1}\bm{X}_{k-1}+\bm{G}_{k-1}\bm{U}_{k-1}+\bm{w}_{k-1}$$
 
-> $\bm{u}_{k-1}$ is the input </br>
+> $\bm{u}_{k-1}$ is the input
 > $\bm{w}_{k-1}$ is noise
 
 * Measurement model:$$\bm{y}_{k}=\bm{H}_{k}\bm{x}_{k}+\bm{v}_{k}$$
