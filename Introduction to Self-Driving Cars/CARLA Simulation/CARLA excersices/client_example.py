@@ -34,7 +34,7 @@ def run_carla_client(args):
     # context manager, it creates a CARLA client object and starts the
     # connection. It will throw an exception if something goes wrong. The
     # context manager makes sure the connection is always cleaned up on exit.
-    with make_carla_client(args.host, args.port) as client:
+    with make_carla_client(args.host, args.port, timeout=60) as client:
         print('CarlaClient connected')
 
         for episode in range(0, number_of_episodes):
