@@ -1,0 +1,24 @@
+[project]
+name = "position-class"
+version = "0.1.0"
+description = "Class 01: Self-Driving Car Localization & Sensor Fusion (GPS, IMU Drift, Naive Snapping, and Kalman Filtering)"
+readme = "README.md"
+authors = [
+    { name = "yasuomaidana", email = "yasuomaidana@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "ipykernel>=7.3.0",
+    "jupyter>=1.1.1",
+    "nbformat>=5.11.1",
+    "numpy>=2.5.3",
+    "plotly>=7.0.0",
+    "polars>=1.44.2",
+]
+
+[project.scripts]
+position-class = "position_class:main"
+
+[build-system]
+requires = ["uv_build>=0.12.6,<0.13.0"]
+build-backend = "uv_build"
