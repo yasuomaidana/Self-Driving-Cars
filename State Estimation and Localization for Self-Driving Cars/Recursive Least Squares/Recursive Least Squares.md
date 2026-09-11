@@ -90,7 +90,7 @@ $$\log{p(\bm{y}|x)}=-\frac{1}{2R}\left((y_1-x)^2+\dots+
 (y_m-x)^2\right)+C$$
 
 Since
-$$\argmax_z{f(z)}=\argmax_z{\left(-f(z)\right)}$$
+$$\argmax_z{f(z)}=\argmin_z{\left(-f(z)\right)}$$
 ![argmax](./argmax.jpg)
 
 The maximal likelihood problem can therefore be written as

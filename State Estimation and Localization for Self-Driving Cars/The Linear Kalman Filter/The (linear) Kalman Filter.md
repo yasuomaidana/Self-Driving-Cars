@@ -4,7 +4,7 @@
 
 The Kalman Filter requires the following motion and measurement models:
 
-* Motion Model: $$\bm{x}_k=\bm{F}_{k-1}\bm{X}_{k-1}+\bm{G}_{k-1}\bm{U}_{k-1}+\bm{w}_{k-1}$$
+* Motion Model: $$\bm{x}_k=\bm{F}_{k-1}\bm{x}_{k-1}+\bm{G}_{k-1}\bm{U}_{k-1}+\bm{w}_{k-1}$$
 
 > $\bm{u}_{k-1}$ is the input
 > $\bm{w}_{k-1}$ is noise
@@ -32,7 +32,7 @@ $$\hat{\bm{x}}_{k}=\check{\bm{x}}_{k}+\bm{K}_{k}\left(\bm{y}_k-\bm{H}_{k}\check{
 $$\hat{\bm{P}}_{k}=\left(\bm{1}-\bm{K}_{k}\bm{H}_{k}\right)\check{\bm{P}}_{k}$$
 
 > Here
-</br>
+> 
 >* $\left(\bm{y}_k-\bm{H}_{k}\check{\bm{x}}_{k}\right)$ is often called the *"innovation"*
 >* "Checked" variables represents predicted for example, $\check{\bm{x}}_k$ (given motion model) at time k
 >* "Hatted" variables represents **corrected prediction** for example, $\hat{\bm{x}}_k$ (given measurement) at time k
