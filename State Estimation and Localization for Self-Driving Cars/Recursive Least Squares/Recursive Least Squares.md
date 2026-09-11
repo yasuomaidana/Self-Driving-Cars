@@ -1,3 +1,5 @@
+# Batch Least Squares
+$$\hat{\bm{x}}_{WLS}=\left(\bm{H}^T\bm{R}^{-1}\bm{H}\right)^{-1}\bm{H}^T\bm{R}\bm{y}$$
 # Linear Recursive Estimator
 
 1. Suppose we have an optimal estimate, $\hat{\bm{x}}_{k-1}$, of our unknown parameters at
