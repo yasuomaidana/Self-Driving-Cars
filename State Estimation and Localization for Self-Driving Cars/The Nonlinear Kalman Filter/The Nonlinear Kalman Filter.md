@@ -232,12 +232,12 @@ $$\bm{\hat{P}}_k=\check{\bm{P}}_k-\bm{K}_k\bm{P}_y\bm{K}_k^T$$
 
 ## Summary
 
-||EKF|ES-EKF|UKF|
-|--|---|---|---|
-|**Operating Principle**|<center>Linearization </br> (Full State)</center>|<center>Linearization </br>(Error State)</center>|Unscented Transform|
-|**Accuracy**|Good|Better|Best|
-|**Jacobians**|Required|Required|Not required|
-|**Speed**|Slightly faster|Slightly faster|Slightly slower
+| EKF                     | ES-EKF                                            | UKF                                               |                     |
+| ----------------------- | ------------------------------------------------- | ------------------------------------------------- | ------------------- |
+| **Operating Principle** | <center>Linearization </br> (Full State)</center> | <center>Linearization </br>(Error State)</center> | Unscented Transform |
+| **Accuracy**            | Good                                              | Better                                            | Best                |
+| **Jacobians**           | Required                                          | Required                                          | Not required        |
+| **Speed**               | Slightly faster                                   | Slightly faster                                   | Slightly slower     |
 
 ## Additional Resources
 
