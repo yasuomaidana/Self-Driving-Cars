@@ -169,7 +169,8 @@ Here is a runnable simulation showing how RLS updates parameter estimates recurs
 
 ```python
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # Simulate ground truth constant: True Resistance R = 5.0 Ohms
 R_true = 5.0
@@ -186,6 +187,7 @@ R_meas_var = noise_std ** 2
 
 estimates = []
 covariances = []
+steps = list(range(1, N_samples + 1))
 
 for k in range(N_samples):
     H = np.array([[currents[k]]])  # y = H * x -> V = I * R
@@ -204,21 +206,34 @@ for k in range(N_samples):
     estimates.append(x_hat.item())
     covariances.append(P.item())
 
-# Plot results
-fig, ax1 = plt.subplots(figsize=(9, 5))
-ax1.plot(range(1, N_samples + 1), estimates, 'b-o', label='Recursive Estimate $\hat{R}$')
-ax1.axhline(R_true, color='g', linestyle='--', label='True Value $R=5.0\ \Omega$')
-ax1.set_xlabel('Measurement Step (k)')
-ax1.set_ylabel('Resistance ($\Omega$)', color='b')
-ax1.grid(True)
+# Interactive Plotly Visualization
+fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-ax2 = ax1.twinx()
-ax2.plot(range(1, N_samples + 1), covariances, 'r--', label='Variance $P_k$')
-ax2.set_ylabel('Estimation Variance $P$', color='r')
+# Trace 1: Parameter Estimate
+fig.add_trace(
+    go.Scatter(x=steps, y=estimates, mode='lines+markers', name='Recursive Estimate R_hat', line=dict(color='blue', width=2)),
+    secondary_y=False
+)
+fig.add_trace(
+    go.Scatter(x=steps, y=[R_true]*N_samples, mode='lines', name='True R = 5.0 Ω', line=dict(color='green', dash='dash')),
+    secondary_y=False
+)
 
-plt.title('Recursive Least Squares: Convergence and Uncertainty Contraction')
-fig.tight_layout()
-plt.show()
+# Trace 2: Estimation Variance
+fig.add_trace(
+    go.Scatter(x=steps, y=covariances, mode='lines+markers', name='Variance P_k', line=dict(color='red', dash='dot')),
+    secondary_y=True
+)
+
+fig.update_xaxes(title_text="Measurement Step (k)")
+fig.update_yaxes(title_text="Resistance (Ω)", secondary_y=False)
+fig.update_yaxes(title_text="Estimation Variance P", secondary_y=True)
+fig.update_layout(
+    title="Recursive Least Squares: Convergence and Uncertainty Contraction",
+    template="plotly_white",
+    height=450
+)
+fig.show()
 ```
 
 ---

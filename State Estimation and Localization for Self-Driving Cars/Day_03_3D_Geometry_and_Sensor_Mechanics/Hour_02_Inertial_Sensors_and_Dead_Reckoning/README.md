@@ -151,7 +151,7 @@ $$\Delta p(t) = \int_0^t \frac{1}{2} g b_g \tau^2 d\tau = \frac{1}{6} g b_g t^3$
 
 ```python
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 time = np.linspace(0, 60, 600)  # 60 seconds
 dt = 0.1
@@ -166,16 +166,19 @@ accel_drift = 0.5 * b_accel * (time ** 2)
 gyro_drift = (1.0 / 6.0) * g * b_gyro * (time ** 3)
 total_drift = accel_drift + gyro_drift
 
-plt.figure(figsize=(9, 5))
-plt.plot(time, accel_drift, 'b--', label='Accel Bias Drift ($O(t^2)$)')
-plt.plot(time, gyro_drift, 'r--', label='Gyro Gravity Leak Drift ($O(t^3)$)')
-plt.plot(time, total_drift, 'k-', linewidth=2, label='Total Position Error')
-plt.xlabel('Time (seconds)')
-plt.ylabel('Position Error (meters)')
-plt.title('Why Standalone IMUs Diverge: Quadratic & Cubic Drift')
-plt.grid(True)
-plt.legend()
-plt.show()
+fig_drift = go.Figure()
+fig_drift.add_trace(go.Scatter(x=time, y=accel_drift, mode='lines', line=dict(color='blue', dash='dash'), name='Accel Bias Drift (O(t²))'))
+fig_drift.add_trace(go.Scatter(x=time, y=gyro_drift, mode='lines', line=dict(color='red', dash='dot'), name='Gyro Gravity Leak Drift (O(t³))'))
+fig_drift.add_trace(go.Scatter(x=time, y=total_drift, mode='lines', line=dict(color='black', width=3), name='Total Position Drift Error'))
+
+fig_drift.update_layout(
+    title='Why Standalone IMUs Diverge: Quadratic & Cubic Dead-Reckoning Drift',
+    xaxis_title='Time (seconds)',
+    yaxis_title='Position Drift Error (meters)',
+    template='plotly_white',
+    height=450
+)
+fig_drift.show()
 
 print(f"Position Error after 10s: {total_drift[100]:.2f} meters")
 print(f"Position Error after 60s: {total_drift[-1]:.2f} meters")

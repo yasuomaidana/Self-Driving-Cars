@@ -156,7 +156,8 @@ Let us track a car moving at $10\text{ m/s}$ with a GPS receiver that outputs po
 
 ```python
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # 1. Simulation parameters
 dt = 0.1
@@ -211,31 +212,28 @@ for k in range(N):
     vel_est.append(x_hat[1, 0])
     pos_cov.append(P_hat[0, 0])
 
-# 5. Visualization
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+# 5. Interactive Plotly Visualization
+fig = make_subplots(rows=2, cols=1, shared_xaxes=True, subplot_titles=("Position Tracking & ±3σ Confidence Bounds", "Velocity Estimation (Unmeasured Latent State!)"))
 
-# Position plot with 3-sigma bounds
-ax1.plot(time, true_pos, 'k-', label='True Position')
-ax1.scatter(time, measurements, color='gray', s=15, alpha=0.6, label='Noisy GPS')
-ax1.plot(time, pos_est, 'b-', label='Kalman Estimated Position')
 sigma_pos = 3 * np.sqrt(np.array(pos_cov))
-ax1.fill_between(time, np.array(pos_est) - sigma_pos, np.array(pos_est) + sigma_pos, 
-                 color='blue', alpha=0.15, label='$\pm 3\sigma$ Confidence Bound')
-ax1.set_ylabel('Position (m)')
-ax1.legend()
-ax1.grid(True)
-ax1.set_title('Linear Kalman Filter: 1D Vehicle Tracking')
+pos_upper = np.array(pos_est) + sigma_pos
+pos_lower = np.array(pos_est) - sigma_pos
 
-# Velocity plot (Unmeasured state estimated through sensor fusion!)
-ax2.plot(time, [true_velocity]*N, 'k-', label='True Velocity (10 m/s)')
-ax2.plot(time, vel_est, 'g-', label='Kalman Estimated Velocity')
-ax2.set_xlabel('Time (s)')
-ax2.set_ylabel('Velocity (m/s)')
-ax2.legend()
-ax2.grid(True)
+# Subplot 1: Position
+fig.add_trace(go.Scatter(x=time, y=true_pos, mode='lines', line=dict(color='black', width=2), name='True Position'), row=1, col=1)
+fig.add_trace(go.Scatter(x=time, y=measurements, mode='markers', marker=dict(color='gray', size=5, opacity=0.6), name='Noisy GPS Pings'), row=1, col=1)
+fig.add_trace(go.Scatter(x=time, y=pos_est, mode='lines', line=dict(color='blue', width=2), name='Kalman Estimated Position'), row=1, col=1)
+fig.add_trace(go.Scatter(x=np.concatenate([time, time[::-1]]), y=np.concatenate([pos_upper, pos_lower[::-1]]), fill='toself', fillcolor='rgba(0,0,255,0.15)', line=dict(color='rgba(255,255,255,0)'), hoverinfo="skip", showlegend=True, name='±3σ Uncertainty Envelope'), row=1, col=1)
 
-plt.tight_layout()
-plt.show()
+# Subplot 2: Velocity
+fig.add_trace(go.Scatter(x=time, y=[true_velocity]*N, mode='lines', line=dict(color='black', dash='dash'), name='True Velocity (10 m/s)'), row=2, col=1)
+fig.add_trace(go.Scatter(x=time, y=vel_est, mode='lines', line=dict(color='green', width=2), name='Kalman Estimated Velocity'), row=2, col=1)
+
+fig.update_xaxes(title_text="Time (s)", row=2, col=1)
+fig.update_yaxes(title_text="Position (m)", row=1, col=1)
+fig.update_yaxes(title_text="Velocity (m/s)", row=2, col=1)
+fig.update_layout(title="Linear Kalman Filter: 1D Kinematic Vehicle Tracking", template="plotly_white", height=600)
+fig.show()
 ```
 
 > [!important] Notice the Miracle of the Kalman Filter!

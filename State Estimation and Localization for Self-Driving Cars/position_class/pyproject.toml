@@ -12,6 +12,7 @@ dependencies = [
     "jupyter>=1.1.1",
     "nbformat>=5.11.1",
     "numpy>=2.5.3",
+    "opencv-python>=5.0.0.93",
     "plotly>=7.0.0",
     "polars>=1.44.2",
 ]

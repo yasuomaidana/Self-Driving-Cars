@@ -52,7 +52,7 @@ Fill in the `predict()` and `update()` methods in the starter code below:
 
 ```python
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 class KalmanFilter2D:
     def __init__(self, dt: float, sigma_a: float, sigma_meas: float):
@@ -202,18 +202,22 @@ raw_noise_rmse = np.sqrt(np.mean((true_x - meas_x)**2 + (true_y - meas_y)**2))
 print(f"Raw GPS Sensor RMSE:      {raw_noise_rmse:.3f} m")
 print(f"Kalman Filter Track RMSE: {rmse_pos:.3f} m (Error reduced by {((raw_noise_rmse - rmse_pos)/raw_noise_rmse)*100:.1f}%)")
 
-# 5. Plot 2D Trajectory
-plt.figure(figsize=(10, 6))
-plt.plot(true_x, true_y, 'k-', linewidth=2, label='Ground Truth Trajectory')
-plt.scatter(meas_x, meas_y, color='red', s=8, alpha=0.3, label='Noisy Sensor Detections')
-plt.plot(est_x, est_y, 'b--', linewidth=2, label='Kalman Filter Estimate')
-plt.xlabel('East (m)')
-plt.ylabel('North (m)')
-plt.title('2D Vehicle Tracking with Linear Kalman Filter')
-plt.legend()
-plt.grid(True)
-plt.axis('equal')
-plt.show()
+import plotly.graph_objects as go
+
+# 5. Interactive 2D Trajectory Visualization via Plotly
+fig_lab = go.Figure()
+fig_lab.add_trace(go.Scatter(x=true_x, y=true_y, mode='lines', line=dict(color='black', width=3), name='Ground Truth Trajectory'))
+fig_lab.add_trace(go.Scatter(x=meas_x[::3], y=meas_y[::3], mode='markers', marker=dict(size=5, color='red', opacity=0.4), name='Noisy GPS Detections'))
+fig_lab.add_trace(go.Scatter(x=est_x, y=est_y, mode='lines', line=dict(color='blue', width=2, dash='dash'), name='Kalman Filter Estimate'))
+
+fig_lab.update_layout(
+    title=f'2D Vehicle Tracking with Linear Kalman Filter (Track RMSE: {rmse_pos:.2f} m vs. GPS: {raw_noise_rmse:.2f} m)',
+    xaxis_title='East Position (m)',
+    yaxis_title='North Position (m)',
+    template='plotly_white',
+    height=500
+)
+fig_lab.show()
 ```
 
 ---
