@@ -57,10 +57,11 @@ To keep track of time and information flow, we use standard notation:
 
 ## 3. The 5 Core Kalman Filter Equations
 
-### Step 1: State Prediction (Propagation)
-We project our state forward in time using our mathematical understanding of vehicle kinematics and control inputs $\mathbf{u}_{k-1}$:
-
 $$\check{\mathbf{x}}_k = \mathbf{F}_{k-1}\hat{\mathbf{x}}_{k-1} + \mathbf{G}_{k-1}\mathbf{u}_{k-1}$$
+
+> [!important] Understanding the Role of Matrix $\mathbf{G}$ and Input Vector $\mathbf{u}$
+> - **Ego-Vehicle Localization ($\mathbf{u} \neq \mathbf{0}$)**: When estimating the position of the vehicle **we are driving**, we have direct access to our accelerator, brake pedal, and steering commands ($\mathbf{u}_k = [a_x, a_y]^T$). The matrix $\mathbf{G}$ directly injects these known driver actions into the prediction step ($\check{\mathbf{x}} = \mathbf{F}\hat{\mathbf{x}} + \mathbf{G}\mathbf{u}$), preventing dynamic lag during acceleration and braking maneuvers.
+> - **Target Object Tracking ($\mathbf{u} = \mathbf{0}$)**: When our radar/camera tracks a **leading car** ahead (e.g. for Adaptive Cruise Control), we **cannot** access the other driver's throttle/brake commands ($\mathbf{u} = \mathbf{0}$). In this case, $\mathbf{G}$ is omitted and the target's unpredictable accelerations are modeled as stochastic process noise ($\mathbf{w} \sim \mathcal{N}(\mathbf{0}, \mathbf{Q})$).
 
 ### Step 2: Covariance Prediction (Uncertainty Expansion)
 Because physical models are never perfect, motion adds uncertainty. Process noise $\mathbf{Q}_{k-1}$ is added to the projected covariance:
@@ -143,10 +144,10 @@ $$-3\sqrt{P_{ii, k}} \le \hat{e}_{i,k} \le +3\sqrt{P_{ii, k}} \quad (99.7\%\text
 
 In classroom textbooks, $\mathbf{Q}$ and $\mathbf{R}$ are given. In self-driving car engineering, **tuning $\mathbf{Q}$ and $\mathbf{R}$ is the primary job of the localization engineer**.
 
-| Parameter | Meaning | If set TOO HIGH | If set TOO LOW |
-| :--- | :--- | :--- | :--- |
-| **Measurement Noise $\mathbf{R}$** | Uncertainty of sensors (GPS, Radar, etc.) | Filter ignores sensor; clings to motion model. Sluggish response. | Filter trusts sensor blindly; estimates become jittery and noisy. |
-| **Process Noise $\mathbf{Q}$** | Uncertainty of motion model (unmodeled physics) | Filter assumes motion model is unreliable; gain $\mathbf{K}$ increases; noisy trajectory. | Filter assumes motion model is perfect; ignores sensor corrections; suffers from dynamic lag. |
+| Parameter                          | Meaning                                         | If set TOO HIGH                                                                           | If set TOO LOW                                                                                |
+| :--------------------------------- | :---------------------------------------------- | :---------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------- |
+| **Measurement Noise $\mathbf{R}$** | Uncertainty of sensors (GPS, Radar, etc.)       | Filter ignores sensor; clings to motion model. Sluggish response.                         | Filter trusts sensor blindly; estimates become jittery and noisy.                             |
+| **Process Noise $\mathbf{Q}$**     | Uncertainty of motion model (unmodeled physics) | Filter assumes motion model is unreliable; gain $\mathbf{K}$ increases; noisy trajectory. | Filter assumes motion model is perfect; ignores sensor corrections; suffers from dynamic lag. |
 
 ---
 

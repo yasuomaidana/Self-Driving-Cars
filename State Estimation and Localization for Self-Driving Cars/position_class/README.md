@@ -9,6 +9,14 @@ This repository contains interactive instructional notebooks, simulation benchma
 
 ```text
 position_class/
+├── least_squares_exercise.ipynb                         # Lab Exercise: Complete Least Squares Solution & Verification Guide
+├── least_squares_exercise.html                          # Standalone browser view for Solution Guide
+├── least_squares_exercise_student.ipynb                 # Lab Exercise: Scaffolded Student Version (Fill-in-the-TODOs)
+├── least_squares_exercise_student.html                  # Standalone browser view for Student Version
+├── hour_04_linear_kalman_filter_lab.ipynb               # Hour 4 Lab: Complete 1D & 2D Linear Kalman Filter Solution Guide
+├── hour_04_linear_kalman_filter_lab.html                # Standalone browser view for Hour 4 Solution
+├── hour_04_linear_kalman_filter_lab_student.ipynb       # Hour 4 Lab: Scaffolded Student Version (Fill-in-the-TODOs)
+├── hour_04_linear_kalman_filter_lab_student.html        # Standalone browser view for Hour 4 Student Version
 ├── day_01_foundations_and_linear_kalman_filter.ipynb    # Day 01: Least Squares (H, P derivations), RLS, & 2D LKF Tracker
 ├── day_01_foundations_and_linear_kalman_filter.html     # Pre-rendered standalone browser view
 ├── day_02_nonlinear_estimation_and_visual_tracking.ipynb# Day 02: EKF Jacobians, UKF, & VisionBrick FAST-Kalman Object Tracker
@@ -36,11 +44,13 @@ position_class/
 
 ## 📓 Interactive Jupyter Notebooks
 
-### 1. [`day_01_foundations_and_linear_kalman_filter.ipynb`](file:///Users/yasuomaidana/Projects/classes/Self-Driving-Cars/State%20Estimation%20and%20Localization%20for%20Self-Driving%20Cars/position_class/day_01_foundations_and_linear_kalman_filter.ipynb)
-* **Measurement Matrix $\mathbf{H}$ Derivations**: 4 automotive engineering calibration examples (Ohm's Law, Wheel Odometry $r_{\text{eff}}$, Initial Kinematics $p_0, v_0$, LiDAR Ground Plane Fitting).
-* **Error Covariance $\mathbf{P}$**: Derivation from Gauss-Markov assumptions and confidence ellipsoids.
-* **Cross-Disciplinary Notation Table**: Comparison across Control Theory, Robotics/SLAM, Aerospace/GNSS, and Computer Vision.
-* **2D Linear Kalman Filter**: 4D Constant Velocity tracking with interactive Plotly visualizations.
+### 1. [`hour_04_linear_kalman_filter_lab.ipynb`](file:///Users/yasuomaidana/Projects/classes/Self-Driving-Cars/State%20Estimation%20and%20Localization%20for%20Self-Driving%20Cars/position_class/hour_04_linear_kalman_filter_lab.ipynb) ([Student Version](file:///Users/yasuomaidana/Projects/classes/Self-Driving-Cars/State%20Estimation%20and%20Localization%20for%20Self-Driving%20Cars/position_class/hour_04_linear_kalman_filter_lab_student.ipynb))
+* **1D Kinematic Tracking**: Latent velocity discovery from position-only noisy GPS pings with $\pm 3\sigma$ confidence envelopes.
+* **2D Vehicle Tracking**: 4D state vector ($\mathbf{x} = [x, y, \dot{x}, \dot{y}]^T$) under Constant Velocity motion on curved highway paths.
+* **Sensor Dropout Simulation**: 5-second GPS blackout in a tunnel, dead reckoning drift, and covariance expansion/collapse.
+* **$\mathbf{Q}$ vs. $\mathbf{R}$ Tuning Analysis**: Overconfident model (dynamic lag) vs. underconfident model (measurement jitter).
+* **Statistical Consistency & NEES**: Normalized Estimation Error Squared against 95% $\chi_4^2$ bounds.
+* **Datasheet Prior Initialization**: $3\sigma$ spec-based initialization vs. cold diffuse prior.
 
 ### 2. [`day_02_nonlinear_estimation_and_visual_tracking.ipynb`](file:///Users/yasuomaidana/Projects/classes/Self-Driving-Cars/State%20Estimation%20and%20Localization%20for%20Self-Driving%20Cars/position_class/day_02_nonlinear_estimation_and_visual_tracking.ipynb)
 * **Analytical Jacobians**: Mathematical derivation and verification of $\mathbf{F}_{k-1}, \mathbf{L}_{k-1}, \mathbf{H}_k, \mathbf{M}_k$.

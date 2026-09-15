@@ -34,12 +34,12 @@ $$\begin{aligned}
 
 Using a first-order Taylor series expansion about operating points $(\hat{\mathbf{x}}_{k-1}, \mathbf{w}=\mathbf{0})$ and $(\check{\mathbf{x}}_k, \mathbf{v}=\mathbf{0})$, we define the four fundamental Jacobian matrices:
 
-| Jacobian | Mathematical Definition | Dimensions | Physical Meaning |
-| :--- | :--- | :---: | :--- |
-| $\mathbf{F}_{k-1}$ | $\left. \frac{\partial \mathbf{f}_{k-1}}{\partial \mathbf{x}_{k-1}} \right|_{\hat{\mathbf{x}}_{k-1}, \mathbf{u}_{k-1}, \mathbf{0}}$ | $n \times n$ | **Motion Jacobian:** Sensitivity of predicted state to prior state errors. |
-| $\mathbf{L}_{k-1}$ | $\left. \frac{\partial \mathbf{f}_{k-1}}{\partial \mathbf{w}_{k-1}} \right|_{\hat{\mathbf{x}}_{k-1}, \mathbf{u}_{k-1}, \mathbf{0}}$ | $n \times n_w$ | **Process Noise Jacobian:** How disturbances/actuator noise map into state errors. |
-| $\mathbf{H}_k$ | $\left. \frac{\partial \mathbf{h}_k}{\partial \mathbf{x}_k} \right|_{\check{\mathbf{x}}_k, \mathbf{0}}$ | $m \times n$ | **Measurement Jacobian:** Sensitivity of sensor readings to state changes. |
-| $\mathbf{M}_k$ | $\left. \frac{\partial \mathbf{h}_k}{\partial \mathbf{v}_k} \right|_{\check{\mathbf{x}}_k, \mathbf{0}}$ | $m \times n_v$ | **Measurement Noise Jacobian:** How raw sensor noise couples into observations. |
+| Jacobian           | Mathematical Definition                                                    |                        Dimensions                        | Physical Meaning |                                                                                    |
+| :----------------- | :------------------------------------------------------------------------- | :------------------------------------------------------: | :--------------- | ---------------------------------------------------------------------------------- |
+| $\mathbf{F}_{k-1}$ | $\left. \frac{\partial \mathbf{f}_{k-1}}{\partial \mathbf{x}_{k-1}} \right | _{\hat{\mathbf{x}}_{k-1}, \mathbf{u}_{k-1}, \mathbf{0}}$ | $n \times n$     | **Motion Jacobian:** Sensitivity of predicted state to prior state errors.         |
+| $\mathbf{L}_{k-1}$ | $\left. \frac{\partial \mathbf{f}_{k-1}}{\partial \mathbf{w}_{k-1}} \right | _{\hat{\mathbf{x}}_{k-1}, \mathbf{u}_{k-1}, \mathbf{0}}$ | $n \times n_w$   | **Process Noise Jacobian:** How disturbances/actuator noise map into state errors. |
+| $\mathbf{H}_k$     | $\left. \frac{\partial \mathbf{h}_k}{\partial \mathbf{x}_k} \right         |           _{\check{\mathbf{x}}_k, \mathbf{0}}$           | $m \times n$     | **Measurement Jacobian:** Sensitivity of sensor readings to state changes.         |
+| $\mathbf{M}_k$     | $\left. \frac{\partial \mathbf{h}_k}{\partial \mathbf{v}_k} \right         |           _{\check{\mathbf{x}}_k, \mathbf{0}}$           | $m \times n_v$   | **Measurement Noise Jacobian:** How raw sensor noise couples into observations.    |
 
 ---
 
