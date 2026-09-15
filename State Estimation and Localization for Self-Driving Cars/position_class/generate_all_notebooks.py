@@ -91,34 +91,55 @@ $$\mathbf{P} = \mathbb{E}[(\hat{\mathbf{x}} - \mathbf{x}_{\text{true}})(\hat{\ma
         ),
         nbf.v4.new_code_cell(
 """# Visualizing LiDAR Ground Plane Fit with Plotly 3D Scatter
-np.random.seed(42)
-N = 150
-x_pts = np.random.uniform(-10, 10, N)
-y_pts = np.random.uniform(5, 35, N)
-a_true, b_true, c_true = 0.02, -0.05, -1.50
-z_pts = a_true * x_pts + b_true * y_pts + c_true + np.random.normal(0, 0.04, N)
+from position_class import fit_lidar_ground_plane
 
-# Plane mesh
-xx, yy = np.meshgrid(np.linspace(-10, 10, 10), np.linspace(5, 35, 10))
-zz = lidar_params[0] * xx + lidar_params[1] * yy + lidar_params[2]
+np.random.seed(42)
+N = 250
+# Forward range: 2m to 30m, Lateral range: -4m to +4m
+x_pts = np.random.uniform(2.0, 30.0, N)
+y_pts = np.random.uniform(-4.0, 4.0, N)
+
+# True road parameters: uphill pitch +1.15 deg (a=0.02), bank/camber roll -0.57 deg (b=-0.01), sensor height 1.70m (c=-1.70)
+a_true, b_true, c_true = 0.02, -0.01, -1.70
+sigma_lidar = 0.03  # 3cm ranging noise
+z_pts = a_true * x_pts + b_true * y_pts + c_true + np.random.normal(0, sigma_lidar, N)
+
+# Run Batch Least Squares Plane Fitting
+plane_fit = fit_lidar_ground_plane(x_pts, y_pts, z_pts, sigma_z=sigma_lidar)
+
+print("=== LiDAR Ground Plane Estimation Results ===")
+print(f"Estimated Model: z = {plane_fit['a']:.5f}*x + {plane_fit['b']:.5f}*y + {plane_fit['c']:.4f}")
+print(f"Road Pitch: {plane_fit['pitch_deg']:.3f}° (True: {np.degrees(np.arctan(a_true)):.3f}°)")
+print(f"Road Roll:  {plane_fit['roll_deg']:.3f}° (True: {np.degrees(np.arctan(-b_true)):.3f}°)")
+print(f"Sensor Height: {plane_fit['sensor_height_m']:.3f} m (True: 1.700 m)")
+print(f"Fit RMSE: {plane_fit['rmse_m']*100:.2f} cm")
+print(f"Plane Normal: {plane_fit['normal_vector']}")
+
+# Generate Plane Mesh
+xx, yy = np.meshgrid(np.linspace(2.0, 30.0, 15), np.linspace(-4.0, 4.0, 10))
+zz = plane_fit['a'] * xx + plane_fit['b'] * yy + plane_fit['c']
 
 fig = go.Figure()
 fig.add_trace(go.Scatter3d(
     x=x_pts, y=y_pts, z=z_pts,
     mode='markers',
-    marker=dict(size=4, color='orange', opacity=0.8),
+    marker=dict(size=3, color=z_pts, colorscale='Turbo', opacity=0.8),
     name='LiDAR Ground Points'
 ))
 fig.add_trace(go.Surface(
     x=xx, y=yy, z=zz,
-    opacity=0.5,
+    opacity=0.6,
     colorscale='Viridis',
     showscale=False,
-    name='Fitted Plane'
+    name='Estimated Road Plane'
 ))
 fig.update_layout(
-    title='<b>LiDAR Ground Plane Least Squares Estimation</b>',
-    scene=dict(xaxis_title='X [m] (Lateral)', yaxis_title='Y [m] (Longitudinal)', zaxis_title='Z [m] (Elevation)'),
+    title='<b>LiDAR Ground Plane Least Squares Estimation (ISO 8855 Frame)</b>',
+    scene=dict(
+        xaxis_title='X [m] (Forward / Longitudinal)',
+        yaxis_title='Y [m] (Lateral / Left)',
+        zaxis_title='Z [m] (Elevation / Up)'
+    ),
     margin=dict(l=0, r=0, b=0, t=40)
 )
 fig.show()

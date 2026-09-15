@@ -131,10 +131,48 @@ class LinearKalmanFilter:
         return KalmanState(x=self.x.copy(), P=self.P.copy())
 
 
+def create_1d_constant_velocity_tracker(
+    dt: float = 0.1,
+    sigma_pos_gps: float = 1.5,
+    sigma_acc_process: float = 0.5,
+    x0: Optional[np.ndarray] = None,
+    P0: Optional[np.ndarray] = None,
+) -> LinearKalmanFilter:
+    """Helper creating a 1D Constant Velocity (CV) vehicle tracker.
+    
+    State: x = [p, v]^T
+    Sensors: GPS position y = [p_meas]
+    """
+    F = np.array([
+        [1.0, dt],
+        [0.0, 1.0]
+    ])
+    
+    H = np.array([[1.0, 0.0]])
+    
+    # Continuous white-noise acceleration discretization
+    q_pos = (dt**4) / 4.0 * (sigma_acc_process**2)
+    q_vel = (dt**2) * (sigma_acc_process**2)
+    q_pos_vel = (dt**3) / 2.0 * (sigma_acc_process**2)
+    
+    Q = np.array([
+        [q_pos,     q_pos_vel],
+        [q_pos_vel, q_vel    ]
+    ])
+    
+    R = np.array([[sigma_pos_gps**2]])
+    if P0 is None:
+        P0 = np.diag([10.0**2, 5.0**2])
+    
+    return LinearKalmanFilter(F=F, H=H, Q=Q, R=R, x0=x0, P0=P0)
+
+
 def create_2d_constant_velocity_tracker(
     dt: float = 0.1,
     sigma_pos_gps: float = 3.0,
-    sigma_acc_process: float = 0.5
+    sigma_acc_process: float = 0.5,
+    x0: Optional[np.ndarray] = None,
+    P0: Optional[np.ndarray] = None,
 ) -> LinearKalmanFilter:
     """Helper creating a 2D Constant Velocity (CV) vehicle tracker.
     
@@ -154,18 +192,41 @@ def create_2d_constant_velocity_tracker(
     ])
     
     # Continuous white-noise acceleration discretization
-    q_pos = (dt**3) / 3.0 * (sigma_acc_process**2)
-    q_vel = dt * (sigma_acc_process**2)
-    q_pos_vel = (dt**2) / 2.0 * (sigma_acc_process**2)
+    dt4 = (dt**4) / 4.0 * (sigma_acc_process**2)
+    dt3 = (dt**3) / 2.0 * (sigma_acc_process**2)
+    dt2 = (dt**2) * (sigma_acc_process**2)
     
     Q = np.array([
-        [q_pos,     0.0,       q_pos_vel, 0.0      ],
-        [0.0,       q_pos,     0.0,       q_pos_vel],
-        [q_pos_vel, 0.0,       q_vel,     0.0      ],
-        [0.0,       q_pos_vel, 0.0,       q_vel    ]
+        [dt4, 0.0, dt3, 0.0],
+        [0.0, dt4, 0.0, dt3],
+        [dt3, 0.0, dt2, 0.0],
+        [0.0, dt3, 0.0, dt2]
     ])
     
     R = np.eye(2) * (sigma_pos_gps**2)
-    P0 = np.diag([10.0**2, 10.0**2, 5.0**2, 5.0**2])
+    if P0 is None:
+        P0 = np.diag([10.0**2, 10.0**2, 5.0**2, 5.0**2])
     
-    return LinearKalmanFilter(F=F, H=H, Q=Q, R=R, P0=P0)
+    return LinearKalmanFilter(F=F, H=H, Q=Q, R=R, x0=x0, P0=P0)
+
+
+def compute_nees(
+    true_states: np.ndarray,
+    est_states: np.ndarray,
+    est_covariances: np.ndarray
+) -> np.ndarray:
+    """Computes Normalized Estimation Error Squared (NEES) for filter consistency analysis.
+    
+    NEES_k = (x_true_k - x_hat_k)^T * P_hat_k^-1 * (x_true_k - x_hat_k)
+    
+    For an n-dimensional state, NEES follows a Chi-square distribution with n degrees of freedom:
+        E[NEES_k] = n
+    """
+    N = len(true_states)
+    nees_values = np.zeros(N)
+    for k in range(N):
+        err = (true_states[k] - est_states[k]).reshape(-1, 1)
+        P_k = est_covariances[k]
+        nees_values[k] = (err.T @ np.linalg.inv(P_k) @ err).item()
+    return nees_values
+
