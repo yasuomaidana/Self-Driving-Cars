@@ -9,7 +9,7 @@ time $k—1$
 > **Goal**: compute $\hat{\bm{x}}_k$ as a function of $\bm{y}_k$ and $\hat{\bm{x}}_{k-1}$
 
 We can use a *linear recursive update*:
-$$\bm{\hat{x}}_k = \bm{\hat{x}}_{k-1} + \bm{K}_k\left(\bm{y}_k - \bm{H}_k\bm{\hat{x}}_{k-1}) \right)$$
+$$\bm{\hat{x}}_k = \bm{\hat{x}}_{k-1} + \bm{K}_k\left(\bm{y}_k - \bm{H}_k\bm{\hat{x}}_{k-1} \right)$$
 
 We update our new state as a linear combination of the previous best guess and the current measurement residual (or error), weighted by a gain matrix $\bm{K}_k$
 
@@ -50,7 +50,7 @@ covariance matrix:
 $$\bm{y}_k=\bm{H}_k\bm{x}+\bm{v}_k$$
 3. Update the estimate of $\bm{\hat{x}}_k$ and the covariance $\bm{\hat{P}}_k$ using:
 $$\bm{K}_k = \bm{P}_{k-1}\bm{H}_k^T\left(\bm{H}_k\bm{P}_{k-1}\bm{H}_k^T+\bm{R}_k\right)^{-1}$$
-$$\bm{\hat{x}}_k = \bm{\hat{x}}_{k-1} + \bm{K}_k\left(\bm{y}_k - \bm{H}_k\bm{\hat{x}}_{k-1}) \right)$$
+$$\bm{\hat{x}}_k = \bm{\hat{x}}_{k-1} + \bm{K}_k\left(\bm{y}_k - \bm{H}_k\bm{\hat{x}}_{k-1} \right)$$
 $$\bm{P}_k =(1-\bm{K}_k\bm{H}_k)\bm{P}_{k-1}$$
 
 ## The Method of Maximum Likelihood
@@ -82,15 +82,15 @@ The maximal likelihood estimate (MLE) is given by
 $$\hat{x}_{MLE}=\argmax_x{p(\bm{y}|x)}$$
 
 Instead of trying to optimize the likelihood directly, we can take its logarithm:
-$$\hat{x}_{MLE}=\argmax_x{p(\bm{y}|x)}\\
-=\argmax_x{\log{p(\bm{y}|x)}}$$
+$$\hat{x}_{MLE}=\argmax_x{\ p(\bm{y}|x)}\\
+=\argmax_x{\ \log{p(\bm{y}|x)}}$$
 
 Resulting in:
 $$\log{p(\bm{y}|x)}=-\frac{1}{2R}\left((y_1-x)^2+\dots+
 (y_m-x)^2\right)+C$$
 
 Since
-$$\argmax_z{f(z)}=\argmin_z{\left(-f(z)\right)}$$
+$$\argmax_z{\ f(z)}=\argmin_z{\left(-f(z)\right)}$$
 ![argmax](./argmax.jpg)
 
 The maximal likelihood problem can therefore be written as
