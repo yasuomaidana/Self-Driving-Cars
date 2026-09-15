@@ -25,7 +25,83 @@ $$\left. \frac{\partial \bm{h}_{k}}{\partial\bm{x}_{k-1}} \right|_{\check{\bm{x}
 We now have a linear system in state-space! The matrices $\bm{F}_{k-1}$, $\bm{L}_{k-1}$, $\bm{H}_{k}$, and $\bm{M}_{k}$ are
 called the Jacobian matrices of the system.
 
-Intuitively, the Jacobian matrix tells you how fast each output of the function is changing along each input dimension
+Intuitively, the Jacobian matrix tells you how fast each output of the function is changing along each input dimension.
+
+---
+
+### Understanding the Noise Jacobians ($\bm{L}$ and $\bm{M}$)
+
+In standard linear Kalman filtering, noise is assumed to be **purely additive** ($\bm{w}$ added directly to state derivatives, $\bm{v}$ added directly to measurements). In real-world robotic and self-driving systems, noise often enters **nonlinearly** through control inputs (actuators) or coordinate transformations.
+
+* **$\bm{L}_{k-1}$ (Process Noise Jacobian):** Maps process / input noise $\bm{w}_{k-1}$ into the state space. It appears in the covariance prediction step:
+  $$\check{\bm{P}}_k = \bm{F}_{k-1} \hat{\bm{P}}_{k-1} \bm{F}_{k-1}^T + \bm{L}_{k-1} \bm{Q}_{k-1} \bm{L}_{k-1}^T$$
+* **$\bm{M}_k$ (Measurement Noise Jacobian):** Maps raw measurement noise $\bm{v}_k$ into the measurement space. It appears in the innovation covariance / Kalman gain:
+  $$\bm{S}_k = \bm{H}_k \check{\bm{P}}_k \bm{H}_k^T + \bm{M}_k \bm{R}_k \bm{M}_k^T$$
+
+---
+
+### Example 1: Derivation of $\bm{L}_{k-1}$ (Process Noise Jacobian)
+
+#### Case A: Additive Process Noise
+If noise enters additively as $\bm{x}_k = \bm{f}_{k-1}(\bm{x}_{k-1}, \bm{u}_{k-1}) + \bm{w}_{k-1}$, where $\bm{w}_{k-1} \in \mathbb{R}^n$:
+$$\bm{L}_{k-1} = \left. \frac{\partial \bm{f}_{k-1}}{\partial \bm{w}_{k-1}} \right|_{\hat{\bm{x}}_{k-1}, \bm{u}_{k-1}, \bm{0}} = \bm{I}_{n \times n}$$
+
+#### Case B: Non-Additive Actuator/Control Noise (2D Vehicle Kinematics)
+Consider a vehicle state with 2D position and heading:
+$$\bm{x}_{k-1} = \begin{bmatrix} p_x \\ p_y \\ \theta \end{bmatrix}_{k-1}$$
+
+The control inputs are linear velocity $v_{k-1}$ and yaw rate $\omega_{k-1}$, corrupted by input noise $\bm{w}_{k-1} = \begin{bmatrix} w_v \\ w_\omega \end{bmatrix}_{k-1} \sim \mathcal{N}(\bm{0}, \bm{Q}_{k-1})$. Over a sampling time $\Delta t$, the nonlinear motion equations are:
+
+$$\bm{f}_{k-1}(\bm{x}_{k-1}, \bm{u}_{k-1}, \bm{w}_{k-1}) = \begin{bmatrix} f_1 \\ f_2 \\ f_3 \end{bmatrix} = \begin{bmatrix} p_{x, k-1} + (v_{k-1} + w_{v, k-1}) \cos(\theta_{k-1}) \Delta t \\ p_{y, k-1} + (v_{k-1} + w_{v, k-1}) \sin(\theta_{k-1}) \Delta t \\ \theta_{k-1} + (\omega_{k-1} + w_{\omega, k-1}) \Delta t \end{bmatrix}$$
+
+To compute $\bm{L}_{k-1}$, take the partial derivatives with respect to each component of noise $\bm{w} = \begin{bmatrix} w_v & w_\omega \end{bmatrix}^T$:
+
+$$\bm{L}_{k-1} = \left. \frac{\partial \bm{f}_{k-1}}{\partial \bm{w}_{k-1}} \right|_{\hat{\bm{x}}_{k-1}, \bm{u}_{k-1}, \bm{w}=\bm{0}} = \begin{bmatrix} \frac{\partial f_1}{\partial w_v} & \frac{\partial f_1}{\partial w_\omega} \\ \frac{\partial f_2}{\partial w_v} & \frac{\partial f_2}{\partial w_\omega} \\ \frac{\partial f_3}{\partial w_v} & \frac{\partial f_3}{\partial w_\omega} \end{bmatrix}_{\hat{\bm{x}}_{k-1}, \bm{0}}$$
+
+Evaluating each term:
+1. $\frac{\partial f_1}{\partial w_v} = \cos(\hat{\theta}_{k-1}) \Delta t$, $\quad \frac{\partial f_1}{\partial w_\omega} = 0$
+2. $\frac{\partial f_2}{\partial w_v} = \sin(\hat{\theta}_{k-1}) \Delta t$, $\quad \frac{\partial f_2}{\partial w_\omega} = 0$
+3. $\frac{\partial f_3}{\partial w_v} = 0$, $\quad \frac{\partial f_3}{\partial w_\omega} = \Delta t$
+
+Thus:
+$$\bm{L}_{k-1} = \begin{bmatrix} \cos(\hat{\theta}_{k-1}) \Delta t & 0 \\ \sin(\hat{\theta}_{k-1}) \Delta t & 0 \\ 0 & \Delta t \end{bmatrix} \in \mathbb{R}^{3 \times 2}$$
+
+> **Key takeaway:** $\bm{L}_{k-1}$ maps the $2\text{D}$ actuator noise into the $3\text{D}$ state space, projecting velocity noise along the vehicle's heading direction $\hat{\theta}_{k-1}$.
+
+---
+
+### Example 2: Derivation of $\bm{M}_k$ (Measurement Noise Jacobian)
+
+#### Case A: Additive Measurement Noise
+If the measurement model is $\bm{y}_k = \bm{h}_k(\bm{x}_k) + \bm{v}_k$, where $\bm{v}_k \in \mathbb{R}^m$:
+$$\bm{M}_k = \left. \frac{\partial \bm{h}_k}{\partial \bm{v}_k} \right|_{\check{\bm{x}}_k, \bm{0}} = \bm{I}_{m \times m}$$
+
+#### Case B: Non-Additive Sensor Noise (Polar Sensor Converted to Cartesian Measurement)
+Suppose a LiDAR or Radar measures range $r$ and bearing $\phi$ with sensor noise $\bm{v}_k = \begin{bmatrix} v_r \\ v_\phi \end{bmatrix} \sim \mathcal{N}(\bm{0}, \bm{R}_k)$, but the measurement pre-processor converts them into Cartesian coordinates $\bm{y}_k = \begin{bmatrix} y_x \\ y_y \end{bmatrix}$:
+
+$$\bm{y}_k = \bm{h}_k(\bm{x}_k, \bm{v}_k) = \begin{bmatrix} h_1 \\ h_2 \end{bmatrix} = \begin{bmatrix} (r_k(\bm{x}_k) + v_r) \cos(\phi_k(\bm{x}_k) + v_\phi) \\ (r_k(\bm{x}_k) + v_r) \sin(\phi_k(\bm{x}_k) + v_\phi) \end{bmatrix}$$
+
+To compute $\bm{M}_k$, take the partial derivatives with respect to $\bm{v}_k = \begin{bmatrix} v_r & v_\phi \end{bmatrix}^T$ at $\bm{v} = \bm{0}$:
+
+$$\bm{M}_k = \left. \frac{\partial \bm{h}_k}{\partial \bm{v}_k} \right|_{\check{\bm{x}}_k, \bm{v}=\bm{0}} = \begin{bmatrix} \frac{\partial h_1}{\partial v_r} & \frac{\partial h_1}{\partial v_\phi} \\ \frac{\partial h_2}{\partial v_r} & \frac{\partial h_2}{\partial v_\phi} \end{bmatrix}_{\check{\bm{x}}_k, \bm{0}}$$
+
+Evaluating each term using the chain rule and evaluating at $\bm{v} = \bm{0}$:
+1. $\left. \frac{\partial h_1}{\partial v_r} \right|_{\bm{v}=\bm{0}} = \cos(\check{\phi}_k)$
+2. $\left. \frac{\partial h_1}{\partial v_\phi} \right|_{\bm{v}=\bm{0}} = -(\check{r}_k + 0) \sin(\check{\phi}_k + 0) = -\check{r}_k \sin(\check{\phi}_k)$
+3. $\left. \frac{\partial h_2}{\partial v_r} \right|_{\bm{v}=\bm{0}} = \sin(\check{\phi}_k)$
+4. $\left. \frac{\partial h_2}{\partial v_\phi} \right|_{\bm{v}=\bm{0}} = (\check{r}_k + 0) \cos(\check{\phi}_k + 0) = \check{r}_k \cos(\check{\phi}_k)$
+
+Thus:
+$$\bm{M}_k = \begin{bmatrix} \cos(\check{\phi}_k) & -\check{r}_k \sin(\check{\phi}_k) \\ \sin(\check{\phi}_k) & \check{r}_k \cos(\check{\phi}_k) \end{bmatrix}$$
+
+> **Key takeaway:** The angular noise $v_\phi$ produces Cartesian uncertainty that grows proportionally with the range distance $\check{r}_k$.
+
+#### Case C: Scale-Factor & Calibration Multiplicative Noise
+Suppose a sensor measuring position $p_k$ has an unknown scaling/calibration error $v_s$ and offset $v_b$ such that $\bm{v}_k = \begin{bmatrix} v_s \\ v_b \end{bmatrix}$:
+$$y_k = h_k(p_k, \bm{v}_k) = p_k (1 + v_s) + v_b$$
+
+The Jacobian $\bm{M}_k$ with respect to noise parameters $\bm{v}_k = \begin{bmatrix} v_s & v_b \end{bmatrix}^T$ is:
+$$\bm{M}_k = \left. \begin{bmatrix} \frac{\partial y_k}{\partial v_s} & \frac{\partial y_k}{\partial v_b} \end{bmatrix} \right|_{\check{p}_k, \bm{0}} = \begin{bmatrix} \check{p}_k & 1 \end{bmatrix}$$
 
 ## Putting it all together
 
