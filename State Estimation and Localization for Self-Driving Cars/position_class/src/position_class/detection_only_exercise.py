@@ -8,8 +8,8 @@ import argparse
 from typing import Optional, Union
 from pathlib import Path
 
-from .tracking_config import parse_tracking_cli_args, TrackingConfig
-from .camera_stream import show_detection_only_stream
+from position_class import parse_tracking_cli_args, TrackingConfig
+from position_class import show_detection_only_stream
 
 
 def run_detection_only_exercise(
