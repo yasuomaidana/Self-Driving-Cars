@@ -272,8 +272,11 @@ class VisualFeatureTracker:
         self._init_detectors()
         
         self.target_descriptors = None
+        self.target_keypoints: Optional[List[cv2.KeyPoint]] = None
         self.target_template: Optional[np.ndarray] = None
+        self.initial_template_size: Tuple[int, int] = (60, 60)
         self.template_size: Tuple[int, int] = (60, 60)
+        self.current_scale: float = 1.0
         self.target_label: str = "Target"
         self.fast_points: List[Tuple[float, float]] = []  # Current coordinates of the K features
         self.is_initialized: bool = False
@@ -299,14 +302,14 @@ class VisualFeatureTracker:
             self.sift = None
 
         if self.algorithm == "sift" and self.sift is not None:
-            self.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
+            self.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
             self.algo_name = f"SIFT ({self.num_points} pts)"
         elif self.algorithm == "orb":
-            self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+            self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
             self.algo_name = f"ORB ({self.num_points} pts)"
         else:
             self.algorithm = "fast"
-            self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+            self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
             self.algo_name = f"FAST ({self.num_points} pts)"
 
     def _extract_top_k_points(
@@ -335,7 +338,7 @@ class VisualFeatureTracker:
                 kp = []
         
         # If FAST or fallback if SIFT/ORB returned 0 keypoints
-        if len(kp) == 0:
+        if len(kp) == 0 and self.fast is not None:
             kp = self.fast.detect(roi_gray, None)
 
         # Fallback to GoodFeaturesToTrack / Shi-Tomasi if fewer than k keypoints found
@@ -380,6 +383,99 @@ class VisualFeatureTracker:
     ) -> List[Tuple[float, float]]:
         """Backward-compatible alias for _extract_top_k_points."""
         return self._extract_top_k_points(roi_gray, origin_x, origin_y, k=k)
+
+    def _estimate_scale_and_geometry(
+        self,
+        query_gray: np.ndarray,
+        origin_x: int = 0,
+        origin_y: int = 0
+    ) -> Optional[Tuple[float, float, float, float, int]]:
+        """Estimate (center_x, center_y, scale_factor, confidence, inlier_count) via feature matching."""
+        if self.target_descriptors is None or self.target_keypoints is None or self.matcher is None:
+            return None
+        if len(self.target_descriptors) < 2:
+            return None
+
+        # Detect and compute in query image
+        q_kp = None
+        q_desc = None
+        if self.algorithm == "sift" and self.sift is not None:
+            try:
+                q_kp, q_desc = self.sift.detectAndCompute(query_gray, None)
+            except Exception:
+                pass
+        elif self.algorithm == "orb" and self.orb is not None:
+            try:
+                q_kp, q_desc = self.orb.detectAndCompute(query_gray, None)
+            except Exception:
+                pass
+        
+        if (q_desc is None or len(q_desc) == 0) and self.fast is not None and self.orb is not None:
+            try:
+                q_kp = self.fast.detect(query_gray, None)
+                if len(q_kp) > 0:
+                    q_kp, q_desc = self.orb.compute(query_gray, q_kp)
+            except Exception:
+                pass
+
+        if q_desc is None or len(q_desc) < 2 or q_kp is None or len(q_kp) < 2:
+            return None
+
+        # KNN matching with Lowe's ratio test
+        try:
+            raw_matches = self.matcher.knnMatch(self.target_descriptors, q_desc, k=2)
+            good_matches = []
+            for m_pair in raw_matches:
+                if len(m_pair) == 2 and m_pair[0].distance < 0.80 * m_pair[1].distance:
+                    good_matches.append(m_pair[0])
+                elif len(m_pair) == 1 and m_pair[0].distance < 50:
+                    good_matches.append(m_pair[0])
+        except Exception:
+            return None
+
+        if len(good_matches) < 3:
+            return None
+
+        src_pts = np.float32([self.target_keypoints[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+        dst_pts = np.float32([q_kp[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+
+        # Estimate scale & similarity transform
+        scale = 1.0
+        inlier_mask = None
+        if len(good_matches) >= 4:
+            M, inlier_mask = cv2.estimateAffinePartial2D(src_pts, dst_pts, method=cv2.RANSAC, ransacReprojThreshold=5.0)
+            if M is not None:
+                scale_val = float(np.sqrt(M[0, 0]**2 + M[0, 1]**2))
+                if 0.25 <= scale_val <= 4.0:
+                    scale = scale_val
+
+        # Fallback to keypoint size ratio or spatial spread
+        if scale == 1.0 and len(good_matches) >= 3:
+            size_ratios = [
+                q_kp[m.trainIdx].size / self.target_keypoints[m.queryIdx].size
+                for m in good_matches
+                if self.target_keypoints[m.queryIdx].size > 0 and q_kp[m.trainIdx].size > 0
+            ]
+            if len(size_ratios) >= 3:
+                med_s = float(np.median(size_ratios))
+                if 0.3 <= med_s <= 3.5:
+                    scale = med_s
+
+        if inlier_mask is not None:
+            inliers = dst_pts[inlier_mask.ravel() == 1]
+            num_inliers = len(inliers)
+            if num_inliers >= 3:
+                cx = float(np.mean(inliers[:, 0, 0])) + origin_x
+                cy = float(np.mean(inliers[:, 0, 1])) + origin_y
+                conf = min(1.0, num_inliers / max(10.0, float(len(self.target_keypoints) * 0.5)))
+                return cx, cy, scale, max(0.55, conf), num_inliers
+
+        # Centroid from good matches
+        pts = dst_pts.reshape(-1, 2)
+        cx = float(np.mean(pts[:, 0])) + origin_x
+        cy = float(np.mean(pts[:, 1])) + origin_y
+        conf = min(1.0, len(good_matches) / 15.0)
+        return cx, cy, scale, conf, len(good_matches)
 
     def refresh_features(
         self,
@@ -454,25 +550,29 @@ class VisualFeatureTracker:
 
         roi = gray[y1:y2, x1:x2]
 
-        # Extract descriptors
+        # Extract descriptors and keypoints
+        kp = None
         desc = None
         if self.algorithm == "sift" and self.sift is not None:
-            _, desc = self.sift.detectAndCompute(roi, None)
-        elif self.algorithm == "orb":
-            _, desc = self.orb.detectAndCompute(roi, None)
+            kp, desc = self.sift.detectAndCompute(roi, None)
+        elif self.algorithm == "orb" and self.orb is not None:
+            kp, desc = self.orb.detectAndCompute(roi, None)
         
         if desc is None or len(desc) == 0:
             kp = self.fast.detect(roi, None) if self.fast is not None else []
             if len(kp) == 0 and self.orb is not None:
                 kp = self.orb.detect(roi, None)
-            if self.orb is not None:
+            if self.orb is not None and len(kp) > 0:
                 kp, desc = self.orb.compute(roi, kp)
                 if desc is None or len(desc) == 0:
-                    _, desc = self.orb.detectAndCompute(roi, None)
+                    kp, desc = self.orb.detectAndCompute(roi, None)
 
+        self.target_keypoints = kp
         self.target_descriptors = desc
         self.target_template = roi.copy()
+        self.initial_template_size = (bw, bh)
         self.template_size = (bw, bh)
+        self.current_scale = 1.0
         self.target_label = label
         self.is_initialized = True
 
@@ -500,9 +600,10 @@ class VisualFeatureTracker:
         auto_refresh: bool = True,
         enable_full_frame_search: bool = True
     ) -> Optional[DetectionResult]:
-        """Track initialized target in new frame with local gating and global full-frame recovery.
+        """Track initialized target in new frame with local gating, scale adaptation, and global full-frame recovery.
         
         1. Localized Search: First searches within the Kalman spatial gate around expected_pos.
+           Estimates scale change (e.g. object moving closer/farther) and adapts bounding box size.
         2. Full-Frame Search: If local search fails or target moved across the screen during occlusion,
            scans the entire frame to re-acquire the object anywhere in the image.
         """
@@ -513,7 +614,7 @@ class VisualFeatureTracker:
         fh, fw = gray.shape[:2]
         tw, th = self.template_size
 
-        if fh < th or fw < tw:
+        if fh < 10 or fw < 10:
             return None
 
         # 1. Localized Search Window centered on the Kalman expected position
@@ -528,67 +629,145 @@ class VisualFeatureTracker:
             sy2 = min(fh, int(expected_tl_y + th + search_margin))
             search_roi = gray[sy1:sy2, sx1:sx2]
             
-            if search_roi.shape[0] >= th and search_roi.shape[1] >= tw:
-                res = cv2.matchTemplate(search_roi, self.target_template, cv2.TM_CCOEFF_NORMED)
-                _, max_val, _, max_loc = cv2.minMaxLoc(res)
-                
-                # Check for genuine visual confirmation in local window
-                if max_val >= min_confidence:
-                    best_x = sx1 + max_loc[0]
-                    best_y = sy1 + max_loc[1]
-                    cx = best_x + tw / 2.0
-                    cy = best_y + th / 2.0
-                    poly = [(float(best_x), float(best_y)), (float(best_x + tw), float(best_y)),
-                            (float(best_x + tw), float(best_y + th)), (float(best_x), float(best_y + th))]
-                    
-                    bbox = (best_x, best_y, tw, th)
+            # Estimate scale from features if present
+            feat_res = self._estimate_scale_and_geometry(search_roi, origin_x=sx1, origin_y=sy1)
+            if feat_res is not None and feat_res[3] >= min_confidence:
+                _, _, s_val, _, _ = feat_res
+                self.current_scale = 0.70 * self.current_scale + 0.30 * s_val
+                init_w, init_h = self.initial_template_size
+                cur_w = max(10, min(fw, int(init_w * self.current_scale)))
+                cur_h = max(10, min(fh, int(init_h * self.current_scale)))
+                self.template_size = (cur_w, cur_h)
+                tw, th = cur_w, cur_h
 
-                    # Dynamically refresh the K feature points on high-confidence frames
-                    if auto_refresh and max_val >= 0.65:
+            if search_roi.shape[0] >= th and search_roi.shape[1] >= tw:
+                templ = self.target_template
+                if (tw, th) != (templ.shape[1], templ.shape[0]) and tw > 4 and th > 4:
+                    templ = cv2.resize(self.target_template, (tw, th), interpolation=cv2.INTER_LINEAR)
+
+                if search_roi.shape[0] >= templ.shape[0] and search_roi.shape[1] >= templ.shape[1]:
+                    res = cv2.matchTemplate(search_roi, templ, cv2.TM_CCOEFF_NORMED)
+                    _, max_val, _, max_loc = cv2.minMaxLoc(res)
+                    
+                    if max_val >= min_confidence:
+                        best_x = sx1 + max_loc[0]
+                        best_y = sy1 + max_loc[1]
+                        cx = best_x + tw / 2.0
+                        cy = best_y + th / 2.0
+                        poly = [(float(best_x), float(best_y)), (float(best_x + tw), float(best_y)),
+                                (float(best_x + tw), float(best_y + th)), (float(best_x), float(best_y + th))]
+                        
+                        bbox = (best_x, best_y, tw, th)
+
+                        if auto_refresh and max_val >= 0.65:
+                            self.refresh_features(frame, bbox, alpha=0.20)
+                        else:
+                            self.fast_points = self._extract_top_k_points(
+                                gray[best_y:best_y+th, best_x:best_x+tw], best_x, best_y, k=self.num_points
+                            )
+
+                        return DetectionResult(
+                            bbox=bbox,
+                            center_of_mass=(cx, cy),
+                            confidence=float(max_val),
+                            label=self.target_label,
+                            polygon=poly,
+                            fast_points=list(self.fast_points)
+                        )
+
+            # If template match in ROI was low but feature geometry succeeded:
+            if feat_res is not None:
+                cx, cy, s_val, conf, inliers = feat_res
+                if conf >= min_confidence:
+                    cur_w, cur_h = self.template_size
+                    best_x = max(0, min(fw - cur_w, int(cx - cur_w / 2.0)))
+                    best_y = max(0, min(fh - cur_h, int(cy - cur_h / 2.0)))
+                    bbox = (best_x, best_y, cur_w, cur_h)
+                    poly = [(float(best_x), float(best_y)), (float(best_x + cur_w), float(best_y)),
+                            (float(best_x + cur_w), float(best_y + cur_h)), (float(best_x), float(best_y + cur_h))]
+
+                    if auto_refresh and conf >= 0.65:
                         self.refresh_features(frame, bbox, alpha=0.20)
                     else:
                         self.fast_points = self._extract_top_k_points(
-                            gray[best_y:best_y+th, best_x:best_x+tw], best_x, best_y, k=self.num_points
+                            gray[best_y:best_y+cur_h, best_x:best_x+cur_w], best_x, best_y, k=self.num_points
                         )
 
                     return DetectionResult(
                         bbox=bbox,
-                        center_of_mass=(cx, cy),
-                        confidence=float(max_val),
+                        center_of_mass=(best_x + cur_w / 2.0, best_y + cur_h / 2.0),
+                        confidence=float(conf),
                         label=self.target_label,
                         polygon=poly,
                         fast_points=list(self.fast_points)
                     )
 
-        # 2. Full-Frame Global Search Fallback (Scans entire picture to recover lost/jumped object)
+        # 2. Full-Frame Global Search Fallback (Scans entire picture to recover lost/jumped/scaled object)
         if enable_full_frame_search:
-            res_full = cv2.matchTemplate(gray, self.target_template, cv2.TM_CCOEFF_NORMED)
-            _, g_max_val, _, g_max_loc = cv2.minMaxLoc(res_full)
-            
-            # Global re-acquisition threshold
-            if g_max_val >= max(0.52, min_confidence):
-                best_x, best_y = g_max_loc
-                cx = best_x + tw / 2.0
-                cy = best_y + th / 2.0
-                poly = [(float(best_x), float(best_y)), (float(best_x + tw), float(best_y)),
-                        (float(best_x + tw), float(best_y + th)), (float(best_x), float(best_y + th))]
-                bbox = (best_x, best_y, tw, th)
+            # First try global template match
+            templ = self.target_template
+            tw, th = self.template_size
+            if (tw, th) != (templ.shape[1], templ.shape[0]) and tw > 4 and th > 4:
+                templ = cv2.resize(self.target_template, (tw, th), interpolation=cv2.INTER_LINEAR)
 
-                # Re-extract the K feature points at the newly discovered location
-                self.fast_points = self._extract_top_k_points(
-                    gray[best_y:best_y+th, best_x:best_x+tw], best_x, best_y, k=self.num_points
-                )
-                if auto_refresh and g_max_val >= 0.65:
-                    self.refresh_features(frame, bbox, alpha=0.25)
+            if gray.shape[0] >= templ.shape[0] and gray.shape[1] >= templ.shape[1]:
+                res_full = cv2.matchTemplate(gray, templ, cv2.TM_CCOEFF_NORMED)
+                _, g_max_val, _, g_max_loc = cv2.minMaxLoc(res_full)
+                
+                if g_max_val >= max(0.52, min_confidence):
+                    best_x, best_y = g_max_loc
+                    cx = best_x + tw / 2.0
+                    cy = best_y + th / 2.0
+                    poly = [(float(best_x), float(best_y)), (float(best_x + tw), float(best_y)),
+                            (float(best_x + tw), float(best_y + th)), (float(best_x), float(best_y + th))]
+                    bbox = (best_x, best_y, tw, th)
 
-                return DetectionResult(
-                    bbox=bbox,
-                    center_of_mass=(cx, cy),
-                    confidence=float(g_max_val),
-                    label=self.target_label,
-                    polygon=poly,
-                    fast_points=list(self.fast_points)
-                )
+                    self.fast_points = self._extract_top_k_points(
+                        gray[best_y:best_y+th, best_x:best_x+tw], best_x, best_y, k=self.num_points
+                    )
+                    if auto_refresh and g_max_val >= 0.65:
+                        self.refresh_features(frame, bbox, alpha=0.25)
+
+                    return DetectionResult(
+                        bbox=bbox,
+                        center_of_mass=(cx, cy),
+                        confidence=float(g_max_val),
+                        label=self.target_label,
+                        polygon=poly,
+                        fast_points=list(self.fast_points)
+                    )
+
+            # Global feature matching fallback
+            global_feat = self._estimate_scale_and_geometry(gray, origin_x=0, origin_y=0)
+            if global_feat is not None:
+                cx, cy, s_val, conf, inliers = global_feat
+                if conf >= max(0.50, min_confidence):
+                    self.current_scale = 0.70 * self.current_scale + 0.30 * s_val
+                    init_w, init_h = self.initial_template_size
+                    cur_w = max(10, min(fw, int(init_w * self.current_scale)))
+                    cur_h = max(10, min(fh, int(init_h * self.current_scale)))
+                    self.template_size = (cur_w, cur_h)
+
+                    best_x = max(0, min(fw - cur_w, int(cx - cur_w / 2.0)))
+                    best_y = max(0, min(fh - cur_h, int(cy - cur_h / 2.0)))
+                    bbox = (best_x, best_y, cur_w, cur_h)
+                    poly = [(float(best_x), float(best_y)), (float(best_x + cur_w), float(best_y)),
+                            (float(best_x + cur_w), float(best_y + cur_h)), (float(best_x), float(best_y + cur_h))]
+
+                    self.fast_points = self._extract_top_k_points(
+                        gray[best_y:best_y+cur_h, best_x:best_x+cur_w], best_x, best_y, k=self.num_points
+                    )
+                    if auto_refresh and conf >= 0.65:
+                        self.refresh_features(frame, bbox, alpha=0.25)
+
+                    return DetectionResult(
+                        bbox=bbox,
+                        center_of_mass=(best_x + cur_w / 2.0, best_y + cur_h / 2.0),
+                        confidence=float(conf),
+                        label=self.target_label,
+                        polygon=poly,
+                        fast_points=list(self.fast_points)
+                    )
 
         return None
 

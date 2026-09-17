@@ -64,6 +64,11 @@ class FastKalmanVisualTracker:
         self.target_keypoints: Optional[List[cv2.KeyPoint]] = None
         self.target_offset_x = 0.0
         self.target_offset_y = 0.0
+        self.target_w = 60.0
+        self.target_h = 60.0
+        self.current_w = 60.0
+        self.current_h = 60.0
+        self.current_scale = 1.0
         self.initialized = False
 
     def initialize_target_from_roi(self, frame: np.ndarray, bbox: Tuple[int, int, int, int]) -> int:
@@ -93,6 +98,11 @@ class FastKalmanVisualTracker:
         self.target_descriptors = descriptors
         self.target_offset_x = float(x)
         self.target_offset_y = float(y)
+        self.target_w = float(w)
+        self.target_h = float(h)
+        self.current_w = float(w)
+        self.current_h = float(h)
+        self.current_scale = 1.0
         
         # Initialize Kalman state at the center of the bounding box
         center_x = float(x + w / 2.0)
@@ -120,38 +130,85 @@ class FastKalmanVisualTracker:
         
         return float(self.x[0, 0]), float(self.x[1, 0])
 
-    def detect_target_in_frame(self, frame: np.ndarray) -> Optional[Tuple[float, float, int]]:
-        """Detect target object in the current frame by matching FAST/ORB descriptors."""
+    def detect_target_in_frame(
+        self,
+        frame: np.ndarray,
+        search_roi_margin: Optional[int] = 100
+    ) -> Optional[Tuple[float, float, int]]:
+        """Detect target object in the current frame by matching FAST/ORB descriptors.
+        
+        Employs hierarchical local search window with full-image fallback to prevent local minima,
+        and dynamically adapts region scale when the object moves closer/farther from camera.
+        """
         if not self.initialized or self.target_descriptors is None:
             return None
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) if frame.ndim == 3 else frame.copy()
-        
-        # Detect keypoints in current frame
-        frame_kp = self.fast.detect(gray, None)
-        if len(frame_kp) == 0:
-            frame_kp = self.orb.detect(gray, None)
+        fh, fw = gray.shape[:2]
 
-        frame_kp, frame_desc = self.orb.compute(gray, frame_kp)
-        
-        if frame_desc is None or len(frame_desc) == 0:
-            return None
+        def _match_in_region(img_region: np.ndarray, offset_x: int = 0, offset_y: int = 0):
+            kp = self.fast.detect(img_region, None)
+            if len(kp) == 0:
+                kp = self.orb.detect(img_region, None)
+            if len(kp) == 0:
+                return None
+            kp, desc = self.orb.compute(img_region, kp)
+            if desc is None or len(desc) == 0:
+                return None
+            
+            raw_matches = self.matcher.match(self.target_descriptors, desc)
+            if len(raw_matches) == 0:
+                return None
+            
+            matches = sorted(raw_matches, key=lambda m: m.distance)
+            good_matches = matches[:min(len(matches), 30)]
+            if len(good_matches) == 0:
+                return None
 
-        # Match descriptors with target template
-        matches = self.matcher.match(self.target_descriptors, frame_desc)
-        if len(matches) == 0:
-            return None
+            pts = np.array([kp[m.trainIdx].pt for m in good_matches])
+            avg_x = float(np.mean(pts[:, 0])) + offset_x
+            avg_y = float(np.mean(pts[:, 1])) + offset_y
 
-        # Sort matches by descriptor distance
-        matches = sorted(matches, key=lambda m: m.distance)
-        good_matches = matches[:min(len(matches), 30)]
+            # Estimate scale adaptation
+            scale = 1.0
+            if len(good_matches) >= 4 and self.target_keypoints is not None:
+                src_pts = np.float32([self.target_keypoints[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+                dst_pts = np.float32([kp[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+                M, _ = cv2.estimateAffinePartial2D(src_pts, dst_pts, method=cv2.RANSAC, ransacReprojThreshold=5.0)
+                if M is not None:
+                    scale_val = float(np.sqrt(M[0, 0]**2 + M[0, 1]**2))
+                    if 0.25 <= scale_val <= 4.0:
+                        scale = scale_val
 
-        # Compute centroid of matched keypoints
-        pts = np.array([frame_kp[m.trainIdx].pt for m in good_matches])
-        avg_x = float(np.mean(pts[:, 0]))
-        avg_y = float(np.mean(pts[:, 1]))
-        
-        return avg_x, avg_y, len(good_matches)
+            return avg_x, avg_y, len(good_matches), scale
+
+        # 1. Local Search Window
+        if search_roi_margin is not None and self.initialized:
+            pred_cx, pred_cy = float(self.x[0, 0]), float(self.x[1, 0])
+            sx1 = max(0, int(pred_cx - self.current_w / 2.0 - search_roi_margin))
+            sy1 = max(0, int(pred_cy - self.current_h / 2.0 - search_roi_margin))
+            sx2 = min(fw, int(pred_cx + self.current_w / 2.0 + search_roi_margin))
+            sy2 = min(fh, int(pred_cy + self.current_h / 2.0 + search_roi_margin))
+
+            if (sx2 - sx1) > 20 and (sy2 - sy1) > 20:
+                local_res = _match_in_region(gray[sy1:sy2, sx1:sx2], offset_x=sx1, offset_y=sy1)
+                if local_res is not None and local_res[2] >= 6:
+                    ax, ay, num_m, scale = local_res
+                    self.current_scale = 0.70 * self.current_scale + 0.30 * scale
+                    self.current_w = max(10.0, self.target_w * self.current_scale)
+                    self.current_h = max(10.0, self.target_h * self.current_scale)
+                    return ax, ay, num_m
+
+        # 2. Whole-Image Global Search Fallback
+        global_res = _match_in_region(gray, offset_x=0, offset_y=0)
+        if global_res is not None:
+            ax, ay, num_m, scale = global_res
+            self.current_scale = 0.70 * self.current_scale + 0.30 * scale
+            self.current_w = max(10.0, self.target_w * self.current_scale)
+            self.current_h = max(10.0, self.target_h * self.current_scale)
+            return ax, ay, num_m
+
+        return None
 
     def process_frame(self, frame: np.ndarray) -> Dict[str, Optional[float]]:
         """Run full prediction + detection + correction cycle on a single frame."""
@@ -179,7 +236,10 @@ class FastKalmanVisualTracker:
             "meas_y": meas_y,
             "est_x": est_x,
             "est_y": est_y,
-            "matches": num_matches
+            "matches": num_matches,
+            "scale": self.current_scale,
+            "bbox_w": self.current_w,
+            "bbox_h": self.current_h
         }
 
 
