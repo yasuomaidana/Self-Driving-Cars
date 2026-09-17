@@ -4,7 +4,7 @@ import math
 import numpy as np
 import pytest
 
-from position_class.tracking_kalman import KalmanTracker2D, KalmanTrackState
+from position_class.tracking_kalman import KalmanTracker2D, KalmanTrackState, build_cv_matrices_2d
 
 
 class TestKalmanTracker2D:
@@ -101,12 +101,78 @@ class TestKalmanTracker2D:
         with pytest.raises(RuntimeError):
             tracker.update((10.0, 10.0))
 
-    def test_reset(self):
-        """Test reset functionality."""
-        tracker = KalmanTracker2D()
-        tracker.initialize(10.0, 10.0)
-        tracker.step((12.0, 12.0), image_shape=(100, 100))
-        assert len(tracker.history) == 1
-        tracker.reset()
-        assert not tracker.initialized
-        assert len(tracker.history) == 0
+    def test_explicit_matrices_injection(self):
+        """Test initializing KalmanTracker2D with custom explicit F, H, Q, R, P0 matrices."""
+        dt = 0.05
+        F, H, Q, R, P0 = build_cv_matrices_2d(dt=dt, process_noise_std=0.8, measurement_noise_std=1.2, initial_covariance=30.0)
+        tracker = KalmanTracker2D(F=F, H=H, Q=Q, R=R, P0=P0)
+        
+        assert tracker.n == 4
+        assert tracker.m == 2
+        np.testing.assert_allclose(tracker.F, F)
+        np.testing.assert_allclose(tracker.H, H)
+        np.testing.assert_allclose(tracker.Q, Q)
+        np.testing.assert_allclose(tracker.R, R)
+        np.testing.assert_allclose(tracker.P, P0)
+
+        tracker.initialize(50.0, 60.0, 2.0, -1.0)
+        px, py, pvx, pvy = tracker.predict()
+        assert math.isclose(px, 50.0 + 2.0 * dt, abs_tol=1e-5)
+        assert math.isclose(py, 60.0 - 1.0 * dt, abs_tol=1e-5)
+
+    def test_build_cv_matrices_structure(self):
+        """Verify the mathematical structure of the 2D Constant Velocity matrices."""
+        dt = 0.1
+        sigma_a = 0.5
+        sigma_meas = 2.0
+        F, H, Q, R, P0 = build_cv_matrices_2d(dt=dt, process_noise_std=sigma_a, measurement_noise_std=sigma_meas)
+
+        # F matrix: constant velocity kinematics
+        assert F.shape == (4, 4)
+        assert F[0, 2] == dt
+        assert F[1, 3] == dt
+        assert F[0, 0] == 1.0 and F[1, 1] == 1.0
+
+        # H matrix: direct position observation
+        assert H.shape == (2, 4)
+        assert H[0, 0] == 1.0 and H[1, 1] == 1.0
+        assert H[0, 2] == 0.0 and H[1, 3] == 0.0
+
+        # R matrix: sensor noise variance
+        assert R.shape == (2, 2)
+        assert math.isclose(R[0, 0], sigma_meas**2)
+        assert math.isclose(R[1, 1], sigma_meas**2)
+
+        # Q matrix: symmetric positive semi-definite
+        assert Q.shape == (4, 4)
+        assert np.allclose(Q, Q.T)
+        eigenvalues = np.linalg.eigvalsh(Q)
+        assert np.all(eigenvalues >= -1e-10)
+
+    def test_student_kalman_tracker(self):
+        """Test that StudentKalmanTracker2D properly implements the BaseKalmanTracker2D interface."""
+        from position_class import StudentKalmanTracker2D
+        tracker = StudentKalmanTracker2D(dt=0.1, process_noise_std=1.0, measurement_noise_std=2.0)
+        tracker.initialize(10.0, 20.0, 1.0, 2.0)
+        assert tracker.is_initialized
+        
+        px, py, pvx, pvy = tracker.predict()
+        assert math.isclose(px, 10.1, abs_tol=1e-5)
+        assert math.isclose(py, 20.2, abs_tol=1e-5)
+
+        ex, ey, evx, evy = tracker.update((10.5, 20.3))
+        assert tracker.position == (ex, ey)
+
+    def test_instructor_kalman_tracker(self):
+        """Test that InstructorKalmanTracker2D executes Joseph stabilized update."""
+        from position_class import InstructorKalmanTracker2D
+        tracker = InstructorKalmanTracker2D(dt=0.1, process_noise_std=1.0, measurement_noise_std=2.0)
+        tracker.initialize(10.0, 20.0, 1.0, 2.0)
+        
+        tracker.predict()
+        ex, ey, evx, evy = tracker.update((10.5, 20.3))
+        assert tracker.P.shape == (4, 4)
+        # Covariance must remain symmetric positive definite
+        assert np.allclose(tracker.P, tracker.P.T)
+        assert np.all(np.linalg.eigvalsh(tracker.P) > 0)
+

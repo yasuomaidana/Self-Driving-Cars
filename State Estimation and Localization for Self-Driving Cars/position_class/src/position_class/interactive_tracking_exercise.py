@@ -19,7 +19,10 @@ from position_class import (
     HybridTracker,
     DetectionResult,
 )
-from position_class import KalmanTracker2D
+from position_class import KalmanTracker2D, build_cv_matrices_2d
+from .base_kalman_tracker import BaseKalmanTracker2D
+from .camera_stream import CameraStream, InteractiveMouseHandler
+from .tracking_config import TrackingConfig, parse_tracking_cli_args
 from position_class import ErrorPublisherService, TrackingErrorSignal
 from position_class import TrackingVisualizer
 from position_class import (
@@ -31,12 +34,26 @@ from position_class import (
 
 
 class InteractiveKalmanAITracker:
-    """Orchestrates the 4 modular components for the interactive AI tracking exercise:
-    1. Input Module (Video / Synthetic frames / Live Camera)
+    """Orchestrates the 5 modular components for the interactive AI tracking exercise:
+    1. Input Module (Video / Synthetic frames / Live Camera / KITTI)
     2. AI Detection & Segmentation Module (YOLO / FAST Feature matching)
-    3. Kalman Filter Module (Constant Velocity 2D Motion Model)
+    3. Kalman Filter Module (Constant Velocity 2D Motion Model with F, H, Q, R, P0 matrices)
     4. Image Output Module (Visualizer with crosshair, CoM, prediction, error line)
     5. Error Output Module (ErrorPublisherService publishing deviation to center)
+
+    Didactic Kalman Filter Framework (Day 01 & Day 02):
+    --------------------------------------------------
+    State vector (4D):
+        x = [p_x, p_y, v_x, v_y]^T
+    Observation vector (2D):
+        y = [p_x_meas, p_y_meas]^T
+
+    Matrices:
+        F: State Transition Matrix (4x4)  -> Kinematics propagation [p + v*dt]
+        H: Measurement Matrix (2x4)        -> Visual CoM observation of [p_x, p_y]
+        Q: Process Noise Covariance (4x4)  -> Acceleration disturbance uncertainty
+        R: Measurement Noise Cov (2x2)     -> Pixel detection noise uncertainty
+        P0: Initial Error Covariance (4x4) -> Initial state uncertainty
     """
 
     def __init__(
@@ -53,7 +70,14 @@ class InteractiveKalmanAITracker:
         dt: float = 1.0 / 30.0,
         process_noise: float = 1.5,
         measurement_noise: float = 2.0,
-        service_name: str = "TrackingVisualErrorService"
+        service_name: str = "TrackingVisualErrorService",
+        # Didactic Kalman Matrix Overrides (matching Day 01 & Day 02):
+        F: Optional[np.ndarray] = None,
+        H: Optional[np.ndarray] = None,
+        Q: Optional[np.ndarray] = None,
+        R: Optional[np.ndarray] = None,
+        P0: Optional[np.ndarray] = None,
+        kalman_tracker: Optional[Union[KalmanTracker2D, BaseKalmanTracker2D]] = None,
     ):
         self.dt = dt
         self.dataset = dataset
@@ -67,12 +91,20 @@ class InteractiveKalmanAITracker:
         self.num_points = max(1, num_points)
         self.state = "IDLE"  # "IDLE" -> "TRACKING" -> "LOST"
         
-        # Modules
-        self.kalman = KalmanTracker2D(
-            dt=dt,
-            process_noise_std=process_noise,
-            measurement_noise_std=measurement_noise
-        )
+        # 1. Kalman Filter Module (supports direct instance or explicit F, H, Q, R, P0 matrices)
+        if kalman_tracker is not None:
+            self.kalman = kalman_tracker
+        else:
+            self.kalman = KalmanTracker2D(
+                dt=dt,
+                process_noise_std=process_noise,
+                measurement_noise_std=measurement_noise,
+                F=F,
+                H=H,
+                Q=Q,
+                R=R,
+                P0=P0,
+            )
         self.yolo_detector = YOLODetector(model_name=yolo_model_name, dataset=dataset)
         self.fast_tracker = VisualFeatureTracker(
             algorithm=self.feature_algorithm,
@@ -509,7 +541,16 @@ def run_interactive_tracking_exercise(
     auto_click_coords: Optional[Tuple[int, int]] = None,
     interactive_gui: bool = True,
     save_output: bool = True,
-    max_live_frames: Optional[int] = None
+    max_live_frames: Optional[int] = None,
+    dt: float = 1.0 / 30.0,
+    process_noise: float = 1.5,
+    measurement_noise: float = 2.0,
+    F: Optional[np.ndarray] = None,
+    H: Optional[np.ndarray] = None,
+    Q: Optional[np.ndarray] = None,
+    R: Optional[np.ndarray] = None,
+    P0: Optional[np.ndarray] = None,
+    kalman_tracker: Optional[Union[KalmanTracker2D, BaseKalmanTracker2D]] = None,
 ) -> InteractiveKalmanAITracker:
     """Run Program 2: Interactive AI + Kalman Object Tracking Exercise.
 
@@ -571,7 +612,16 @@ def run_interactive_tracking_exercise(
         feature_only=effective_feature_only,
         disable_helper=disable_helper,
         feature_algorithm=feature_algorithm,
-        num_points=num_points
+        num_points=num_points,
+        dt=dt,
+        process_noise=process_noise,
+        measurement_noise=measurement_noise,
+        F=F,
+        H=H,
+        Q=Q,
+        R=R,
+        P0=P0,
+        kalman_tracker=kalman_tracker,
     )
     csv_log_path = out_path / "interactive_error_log.csv"
     tracker.error_service.enable_csv_logging(csv_log_path)
@@ -935,88 +985,32 @@ def run_interactive_tracking_exercise(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Program 2: Interactive AI (YOLO/FAST) + Kalman Visual Tracking")
-    parser.add_argument("--source", type=str, default=None, help="Input video file or JSON dataset")
-    parser.add_argument("--camera", action="store_true", help="Use live webcam / camera stream")
-    parser.add_argument("--camera-id", type=int, default=None, help="Camera device index (default: 0)")
-    parser.add_argument("--model", type=str, default="yolov8n.pt",
-                        help="YOLO model name or weights file (e.g. 'yolov8n.pt', 'yolo26n.pt', 'kitti_best.pt')")
-    parser.add_argument("--dataset", type=str, default=None,
-                        help="Dataset preset for YOLO classes (e.g. 'kitti', 'coco', 'visdrone', 'bdd100k')")
-    parser.add_argument("--class", "--target-class", dest="target_class", type=str, default=None,
-                        help="Filter target class (e.g. 'person', 'car', 'bottle', 'cup', 'cell phone'). Default: all classes")
-    parser.add_argument("--hybrid", action="store_true",
-                        help="Enable Hybrid Mode: feature tracking with dynamic refresh & YOLO re-acquisition")
-    parser.add_argument("--feature-only", "--no-yolo", action="store_true",
-                        help="Run strictly in Feature-Only mode (FAST/SIFT/ORB + Kalman), disabling YOLO detection")
-    parser.add_argument("--algorithm", "--feature-algo", "--algo", dest="algorithm", type=str, default="fast",
-                        choices=["fast", "sift", "orb", "none", "off", "disabled"],
-                        help="Helper feature extraction algorithm: 'fast', 'sift', 'orb', or 'none' (default: 'fast')")
-    parser.add_argument("--disable-helper", "--no-helper", "--no-feature", "--no-features", action="store_true",
-                        help="Disable visual feature helper algorithm (FAST/SIFT/ORB), running strictly with YOLO + Kalman")
-    parser.add_argument("--num-points", "--points", "-k", dest="num_points", type=int, default=3,
-                        help="Number of prominent feature keypoints to track and refresh (default: 3)")
-    parser.add_argument("--sift", action="store_true", help="Shortcut to run with SIFT feature extractor")
-    parser.add_argument("--orb", action="store_true", help="Shortcut to run with ORB feature extractor")
-    parser.add_argument("--fast", action="store_true", help="Shortcut to run with FAST feature extractor")
-    parser.add_argument("--auto-lock", action="store_true", help="Automatically lock target upon first detection")
-    parser.add_argument("--paused", "--pause", dest="paused", action="store_true",
-                        help="Start in paused mode to select target easily")
-    parser.add_argument("--kitti-dir", type=str, default=None, help="Path to KITTI image_02 sequence folder")
-    parser.add_argument("--kitti-label", type=str, default=None, help="Path to KITTI label_02 text file")
-    parser.add_argument("--kitti", action="store_true", help="Run with realistic KITTI driving street scene (1242x375)")
-    parser.add_argument("--out", type=str, default="tracking_output_interactive", help="Output directory")
-    parser.add_argument("--no-gui", action="store_true", help="Run without interactive GUI window (headless/test mode)")
-    args = parser.parse_args()
-
-    cam_id = args.camera_id if args.camera_id is not None else (0 if args.camera else None)
-
-    # Determine if helper is disabled
-    is_helper_disabled = args.disable_helper or (args.algorithm.lower().strip() in ["none", "off", "disabled"])
-
-    # Determine active feature extraction algorithm
-    selected_algo = args.algorithm
-    if args.sift:
-        selected_algo = "sift"
-        is_helper_disabled = False
-    elif args.orb:
-        selected_algo = "orb"
-        is_helper_disabled = False
-    elif args.fast:
-        selected_algo = "fast"
-        is_helper_disabled = False
-    elif is_helper_disabled:
-        selected_algo = "none"
-
-    is_kitti = bool(args.kitti or args.kitti_dir is not None)
-
-    # In KITTI mode, default to visual feature tracking (FAST/ORB/SIFT) unless --hybrid is explicitly set
-    if is_kitti and not args.hybrid and not is_helper_disabled:
-        is_feature_only = True
-    else:
-        is_feature_only = (args.feature_only or ((args.sift or args.orb or args.fast) and not args.hybrid)) and not is_helper_disabled
-
+    config = parse_tracking_cli_args(description="Program 2: Interactive AI (YOLO/FAST) + Kalman Visual Tracking")
     run_interactive_tracking_exercise(
-        source=args.source,
-        kitti_dir=args.kitti_dir,
-        kitti_label=args.kitti_label,
-        use_kitti_demo=args.kitti,
-        camera_id=cam_id,
-        model_name=args.model,
-        dataset=args.dataset,
-        target_class=args.target_class,
-        auto_lock=args.auto_lock,
-        hybrid_mode=args.hybrid,
-        feature_only=is_feature_only,
-        disable_helper=is_helper_disabled,
-        feature_algorithm=selected_algo,
-        num_points=args.num_points,
-        start_paused=args.paused,
-        output_dir=args.out,
-        interactive_gui=not args.no_gui
+        source=config.source,
+        kitti_dir=config.kitti_dir,
+        kitti_label=config.kitti_label,
+        use_kitti_demo=config.use_kitti_demo,
+        camera_id=config.camera_id,
+        model_name=config.model_name,
+        dataset=config.dataset,
+        target_class=config.target_class,
+        auto_lock=config.auto_lock,
+        hybrid_mode=config.hybrid_mode,
+        feature_only=config.feature_only,
+        disable_helper=config.disable_helper,
+        feature_algorithm=config.feature_algorithm,
+        num_points=config.num_points,
+        start_paused=config.start_paused,
+        output_dir=config.output_dir,
+        interactive_gui=config.interactive_gui,
+        dt=config.dt,
+        process_noise=config.process_noise,
+        measurement_noise=config.measurement_noise,
     )
 
 
 if __name__ == "__main__":
     main()
+
 

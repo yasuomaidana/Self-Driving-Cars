@@ -25,7 +25,9 @@ dependencies = [
 position-class = "position_class:main"
 track-json = "position_class.tracking_exercise_json:main"
 track-interactive = "position_class.interactive_tracking_exercise:main"
+track = "position_class.instructor_tracking_exercise:main"
 
 [build-system]
 requires = ["uv_build>=0.12.6,<0.13.0"]
 build-backend = "uv_build"
+
