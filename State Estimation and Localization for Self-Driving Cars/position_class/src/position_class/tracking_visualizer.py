@@ -131,14 +131,14 @@ class TrackingVisualizer:
             cv2.putText(vis, label_text, (bx + 2, lbl_y2 - 4),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.44, (255, 100, 255) if is_dead_reckoning else (255, 255, 255), 1, cv2.LINE_AA)
 
-        # 2b. Draw FAST 3-Point Refreshed Feature Markers
+        # 2b. Draw Refreshed Feature Keypoint Markers (FAST / SIFT / ORB)
         if fast_points is not None and len(fast_points) > 0 and not is_dead_reckoning:
-            for f_idx, f_pt in enumerate(fast_points[:3]):
+            for f_idx, f_pt in enumerate(fast_points[:20]):
                 fx, fy = int(f_pt[0]), int(f_pt[1])
                 # Small reticle marker
                 cv2.drawMarker(vis, (fx, fy), (0, 255, 255), cv2.MARKER_CROSS, 8, 1, cv2.LINE_AA)
                 cv2.circle(vis, (fx, fy), 3, (0, 240, 255), 1, cv2.LINE_AA)
-                f_label = f"F{f_idx+1}"
+                f_label = f"P{f_idx+1}"
                 cv2.putText(vis, f_label, (fx + 5, fy - 3),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.32, (0, 255, 255), 1, cv2.LINE_AA)
 

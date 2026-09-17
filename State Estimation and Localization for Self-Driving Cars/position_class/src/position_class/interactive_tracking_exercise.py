@@ -12,7 +12,13 @@ from typing import List, Optional, Tuple, Union
 import cv2
 import numpy as np
 
-from position_class import YOLODetector, FastFeatureTracker, HybridTracker, DetectionResult
+from position_class import (
+    YOLODetector,
+    VisualFeatureTracker,
+    FastFeatureTracker,
+    HybridTracker,
+    DetectionResult,
+)
 from position_class import KalmanTracker2D
 from position_class import ErrorPublisherService, TrackingErrorSignal
 from position_class import TrackingVisualizer
@@ -35,21 +41,30 @@ class InteractiveKalmanAITracker:
 
     def __init__(
         self,
-        dt: float = 1.0 / 30.0,
-        process_noise: float = 1.0,
-        measurement_noise: float = 2.0,
         yolo_model_name: str = "yolov8n.pt",
         dataset: Optional[str] = None,
         target_class: Optional[str] = None,
         auto_lock: bool = False,
         hybrid_mode: bool = False,
-        service_name: str = "InteractiveAITrackingService"
+        feature_only: bool = False,
+        disable_helper: bool = False,
+        feature_algorithm: str = "fast",
+        num_points: int = 3,
+        dt: float = 1.0 / 30.0,
+        process_noise: float = 1.5,
+        measurement_noise: float = 2.0,
+        service_name: str = "TrackingVisualErrorService"
     ):
         self.dt = dt
         self.dataset = dataset
         self.target_class = target_class
         self.auto_lock = auto_lock
         self.hybrid_mode = hybrid_mode
+        self.feature_only = feature_only
+        raw_algo = feature_algorithm.lower().strip()
+        self.disable_helper = disable_helper or (raw_algo in ("none", "off", "disabled", "no", "false", ""))
+        self.feature_algorithm = "none" if self.disable_helper else raw_algo
+        self.num_points = max(1, num_points)
         self.state = "IDLE"  # "IDLE" -> "TRACKING" -> "LOST"
         
         # Modules
@@ -59,9 +74,14 @@ class InteractiveKalmanAITracker:
             measurement_noise_std=measurement_noise
         )
         self.yolo_detector = YOLODetector(model_name=yolo_model_name, dataset=dataset)
-        self.fast_tracker = FastFeatureTracker()
+        self.fast_tracker = VisualFeatureTracker(
+            algorithm=self.feature_algorithm,
+            num_points=self.num_points
+        )
         self.hybrid_tracker = HybridTracker(
             yolo_detector=self.yolo_detector,
+            feature_algorithm=self.feature_algorithm,
+            num_points=self.num_points,
             fast_threshold=15,
             yolo_model_name=yolo_model_name,
             dataset=dataset
@@ -70,46 +90,70 @@ class InteractiveKalmanAITracker:
         self.error_service = ErrorPublisherService(service_name=service_name)
         
         base_ai_info = self.yolo_detector.get_model_info()
-        self.model_info = f"HYBRID: 3-pt FAST (Auto-Refresh) + {base_ai_info}" if hybrid_mode else base_ai_info
+        algo_tag = self.feature_algorithm.upper()
+        if self.disable_helper:
+            self.model_info = f"{base_ai_info} [HELPER DISABLED]"
+        elif self.feature_only:
+            self.model_info = f"FEATURE-ONLY: {algo_tag} ({self.num_points} Points + Kalman)"
+        elif self.hybrid_mode:
+            self.model_info = f"HYBRID: {self.num_points}-pt {algo_tag} (Auto-Refresh) + {base_ai_info}"
+        else:
+            self.model_info = base_ai_info
+
         self.clicked_point: Optional[Tuple[int, int]] = None
         self.active_detection: Optional[DetectionResult] = None
         self.selected_label: str = "Selected Object"
         self.current_candidates: List[DetectionResult] = []
+        self.is_custom_fast_mode: bool = False
+
+    @property
+    def allow_region_definition(self) -> bool:
+        """Region definition (drag-to-draw ROI) is allowed ONLY when helper algorithm
+        is enabled AND not running in hybrid mode (where YOLO defines regions)."""
+        return (not self.hybrid_mode) and (not self.disable_helper)
 
     def handle_mouse_click(self, x: int, y: int, frame: np.ndarray) -> None:
         """User click callback to select and initialize target object."""
         self.clicked_point = (x, y)
+        self.is_custom_fast_mode = False
         print(f"[Interactive Tracker] Target clicked at ({x}, {y}). Initializing AI detection...")
 
         # 1. Check if clicked within any YOLO / Salient candidate bounding boxes
         candidates = self.yolo_detector.detect_all(frame, target_class=self.target_class)
         matched = None
-        for det in candidates:
-            bx, by, bw, bh = det.bbox
-            if bx <= x <= bx + bw and by <= y <= by + bh:
-                matched = det
-                break
+        matching_cands = [
+            det for det in candidates
+            if det.bbox[0] <= x <= det.bbox[0] + det.bbox[2]
+            and det.bbox[1] <= y <= det.bbox[1] + det.bbox[3]
+        ]
+        if matching_cands:
+            # Pick the candidate with the smallest bounding box area (innermost / most specific target)
+            matched = min(matching_cands, key=lambda d: d.bbox[2] * d.bbox[3])
 
         # 2. Initialize FAST/ORB template with EXACT bounding box to maintain coordinate alignment
         if matched is None:
+            if self.disable_helper:
+                print(f"[Interactive Tracker] Helper algorithm is disabled. Please click directly on a detected YOLO candidate or press 1-9.")
+                return
             matched = self.fast_tracker.init_target(frame, (x, y), window_size=70, label="Target Object")
             if self.hybrid_mode:
                 self.hybrid_tracker.init_target(frame, (x, y), bbox=matched.bbox, label="Target Object", target_class=self.target_class)
         else:
-            self.fast_tracker.init_target(
-                frame,
-                (int(matched.center_of_mass[0]), int(matched.center_of_mass[1])),
-                bbox=matched.bbox,
-                label=matched.label
-            )
-            if self.hybrid_mode:
-                self.hybrid_tracker.init_target(
+            if not self.disable_helper:
+                self.fast_tracker.init_target(
                     frame,
                     (int(matched.center_of_mass[0]), int(matched.center_of_mass[1])),
                     bbox=matched.bbox,
-                    label=matched.label,
-                    target_class=self.target_class
+                    label=matched.label
                 )
+                if self.hybrid_mode:
+                    self.hybrid_tracker.init_target(
+                        frame,
+                        (int(matched.center_of_mass[0]), int(matched.center_of_mass[1])),
+                        bbox=matched.bbox,
+                        label=matched.label,
+                        target_class=self.target_class
+                    )
 
         self.active_detection = matched
         self.selected_label = matched.label
@@ -119,39 +163,37 @@ class InteractiveKalmanAITracker:
         self.kalman.initialize(cx, cy)
         self.visualizer.reset_trails()
         self.state = "TRACKING"
-        mode_tag = " (HYBRID FAST 3-pt + YOLO)" if self.hybrid_mode else ""
+        mode_tag = " (HYBRID FAST 3-pt + YOLO)" if self.hybrid_mode else (" (YOLO-Only, Helper Disabled)" if self.disable_helper else "")
         print(f"[Interactive Tracker] Locked Target{mode_tag}: '{self.selected_label}' at CoM: ({cx:.1f}, {cy:.1f})")
 
-    def handle_custom_roi(self, bbox: Tuple[int, int, int, int], frame: np.ndarray, label: str = "FAST Custom ROI") -> None:
-        """Extract FAST corner features and ORB descriptors from user-drawn rectangle."""
+    def handle_custom_roi(self, bbox: Tuple[int, int, int, int], frame: np.ndarray, label: Optional[str] = None) -> None:
+        """Extract FAST/SIFT/ORB corner features and descriptors from user-drawn rectangle.
+        Runs in pure feature tracking mode (no YOLO)."""
         bx, by, bw, bh = bbox
         cx = bx + bw / 2.0
         cy = by + bh / 2.0
-        print(f"[Interactive Tracker] User drew custom ROI: ({bx}, {by}, {bw}, {bh}). Extracting FAST features...")
+        if self.fast_tracker.algorithm == "none" or self.fast_tracker.fast is None:
+            self.fast_tracker.algorithm = "fast"
+            self.fast_tracker._init_detectors()
+        algo_tag = self.fast_tracker.algorithm.upper()
+        roi_label = label if label is not None else f"{algo_tag} Custom ROI"
+        print(f"[Interactive Tracker] User drew custom {algo_tag} ROI: ({bx}, {by}, {bw}, {bh}). Tracking with {algo_tag} only ({self.num_points} pts)...")
 
         det = self.fast_tracker.init_target(
             frame=frame,
             click_pos=(int(cx), int(cy)),
             bbox=bbox,
-            label=label
+            label=roi_label
         )
-        if self.hybrid_mode:
-            self.hybrid_tracker.init_target(
-                frame=frame,
-                click_pos=(int(cx), int(cy)),
-                bbox=bbox,
-                label=label,
-                target_class=self.target_class
-            )
-
+        self.is_custom_fast_mode = True
         self.active_detection = det
-        self.selected_label = label
+        self.selected_label = roi_label
 
         # Initialize Kalman Filter
         self.kalman.initialize(cx, cy)
         self.visualizer.reset_trails()
         self.state = "TRACKING"
-        print(f"[Interactive Tracker] FAST Feature Tracking locked on custom ROI at CoM: ({cx:.1f}, {cy:.1f})")
+        print(f"[Interactive Tracker] {algo_tag} Feature Tracking locked on custom ROI at CoM: ({cx:.1f}, {cy:.1f})")
 
     def select_candidate_by_index(self, index: int, frame: np.ndarray) -> bool:
         """Select a candidate directly by its 1-indexed number (e.g. from keyboard 1-9)."""
@@ -169,6 +211,7 @@ class InteractiveKalmanAITracker:
         self.active_detection = None
         self.selected_label = "Selected Object"
         self.current_candidates = []
+        self.is_custom_fast_mode = False
         self.kalman.reset()
         self.visualizer.reset_trails()
         self.hybrid_tracker.is_initialized = False
@@ -187,23 +230,25 @@ class InteractiveKalmanAITracker:
         """Process a single frame through the complete pipeline."""
         h, w = frame.shape[:2]
         error_signal = None
+        algo_tag = self.feature_algorithm.upper()
 
         if self.state == "IDLE":
             # Stage 1: IDLE - Not tracking anything
-            # Scan candidate objects matching target_class filter (or all classes if None)
-            candidates = self.yolo_detector.detect_all(frame, target_class=self.target_class)
-            self.current_candidates = candidates
             vis = frame.copy()
+            candidates = [] if self.feature_only else self.yolo_detector.detect_all(frame, target_class=self.target_class)
+            self.current_candidates = candidates
 
-            # Find if user is hovering over any candidate
+            # Find if user is hovering over any candidate (pick smallest / innermost box if overlapping)
             hovered_idx = None
-            if hover_pos is not None and hover_pos[0] is not None and hover_pos[1] is not None:
+            if hover_pos is not None and hover_pos[0] is not None and hover_pos[1] is not None and len(candidates) > 0:
                 hx, hy = hover_pos
-                for idx, c in enumerate(candidates):
-                    bx, by, bw, bh = c.bbox
-                    if bx <= hx <= bx + bw and by <= hy <= by + bh:
-                        hovered_idx = idx
-                        break
+                matching_indices = [
+                    idx for idx, c in enumerate(candidates)
+                    if c.bbox[0] <= hx <= c.bbox[0] + c.bbox[2]
+                    and c.bbox[1] <= hy <= c.bbox[1] + c.bbox[3]
+                ]
+                if matching_indices:
+                    hovered_idx = min(matching_indices, key=lambda i: candidates[i].bbox[2] * candidates[i].bbox[3])
 
             # Draw alpha color fill ONLY for the hovered candidate box
             if hovered_idx is not None and drawing_roi is None:
@@ -213,8 +258,15 @@ class InteractiveKalmanAITracker:
                 cv2.rectangle(overlay, (hbx, hby), (hbx + hbw, hby + hbh), (0, 220, 255), -1)
                 cv2.addWeighted(overlay, 0.35, vis, 0.65, 0, vis)
 
+            # Draw candidate boxes (draw non-hovered first sorted by area descending, then hovered on top)
+            draw_order = [i for i in range(len(candidates)) if i != hovered_idx]
+            draw_order.sort(key=lambda i: candidates[i].bbox[2] * candidates[i].bbox[3], reverse=True)
+            if hovered_idx is not None:
+                draw_order.append(hovered_idx)
+
             # Draw candidate box outlines and numbered object name badges
-            for idx, c in enumerate(candidates):
+            for idx in draw_order:
+                c = candidates[idx]
                 bx, by, bw, bh = c.bbox
                 is_hov = (idx == hovered_idx and drawing_roi is None)
                 slot_num = f"[{idx+1}] " if idx < 9 else ""
@@ -257,10 +309,23 @@ class InteractiveKalmanAITracker:
             cv2.rectangle(vis, (20, 15), (w - 20, 75), (0, 180, 255), 2)
             
             filter_info = f" [FILTER: {self.target_class.upper()}]" if self.target_class else " [ALL CLASSES]"
+            if self.feature_only:
+                mode_info = f" [FEATURE-ONLY: {algo_tag} {self.num_points}-PT]"
+                hint_text = f"--> DRAG WITH MOUSE TO DRAW {algo_tag} BOUNDING BOX <--"
+            elif self.disable_helper:
+                mode_info = " [YOLO-ONLY (HELPER DISABLED)]"
+                hint_text = "--> CLICK CANDIDATE OR PRESS 1-9 (HELPER DISABLED) <--"
+            elif self.hybrid_mode:
+                mode_info = f" [HYBRID: {algo_tag} + YOLO]"
+                hint_text = "--> CLICK CANDIDATE OR PRESS 1-9 (HYBRID: YOLO DEFINES REGION) <--"
+            else:
+                mode_info = ""
+                hint_text = f"--> DRAG-TO-DRAW {algo_tag} ROI, CLICK CANDIDATE, OR PRESS 1-9 <--"
+
             paused_hint = " [FREEZE SELECTION]" if is_paused else " [SPACE=FREEZE]"
-            cv2.putText(vis, f"IDLE: NOT TRACKING{filter_info}{paused_hint}", (35, 40),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.54, (0, 220, 255), 2, cv2.LINE_AA)
-            cv2.putText(vis, "--> DRAG-TO-DRAW RECTANGLE FOR FAST, CLICK CANDIDATE, OR PRESS 1-9 <--",
+            cv2.putText(vis, f"IDLE: NOT TRACKING{filter_info}{mode_info}{paused_hint}", (35, 40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.50, (0, 220, 255), 2, cv2.LINE_AA)
+            cv2.putText(vis, hint_text,
                         (35, 62), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 255, 255), 1, cv2.LINE_AA)
 
             # Telemetry HUD
@@ -268,13 +333,13 @@ class InteractiveKalmanAITracker:
             self.visualizer._draw_hud(vis, frame_idx, status_text, None, None, None, (cx_img, cy_img), fps, is_live, self.model_info, None)
 
             # Draw active user-drawn rectangle in real-time (rubber-band) in IDLE / selection state
-            if drawing_roi is not None:
+            if drawing_roi is not None and self.allow_region_definition:
                 dbx, dby, dbw, dbh = drawing_roi
                 overlay = vis.copy()
                 cv2.rectangle(overlay, (dbx, dby), (dbx + dbw, dby + dbh), (0, 255, 120), -1)
                 cv2.addWeighted(overlay, 0.30, vis, 0.70, 0, vis)
                 cv2.rectangle(vis, (dbx, dby), (dbx + dbw, dby + dbh), (0, 255, 120), 2, cv2.LINE_AA)
-                roi_tag = f" FAST Feature ROI ({dbw}x{dbh}) "
+                roi_tag = f" {algo_tag} Feature ROI ({dbw}x{dbh}) "
                 cv2.putText(vis, roi_tag, (dbx + 4, max(20, dby - 6)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 255, 120), 2, cv2.LINE_AA)
 
@@ -290,8 +355,25 @@ class InteractiveKalmanAITracker:
         polygon = None
         fast_pts = None
 
-        if self.hybrid_mode:
-            # Hybrid Mode: 3-point FAST corner tracking with dynamic refresh + Full-Frame YOLO re-acquisition
+        if self.feature_only or self.is_custom_fast_mode:
+            # Feature-Only / Custom Region: Pure FAST / SIFT / ORB Tracking ONLY (No YOLO involvement)
+            det = self.fast_tracker.track(
+                frame=frame,
+                expected_pos=(pred_x, pred_y),
+                auto_refresh=True,
+                enable_full_frame_search=True
+            )
+            if det is not None:
+                meas_com = det.center_of_mass
+                bbox = det.bbox
+                polygon = det.polygon
+                fast_pts = det.fast_points
+                self.state = "TRACKING"
+            else:
+                self.state = "OCCLUDED / LOST (PREDICTING)"
+
+        elif self.hybrid_mode:
+            # Hybrid Mode: K-point feature tracking derived & refreshed from previous tracking regions + YOLO re-acquisition
             uncertainty_std = float(np.sqrt(self.kalman.P[0, 0] + self.kalman.P[1, 1]))
             det, track_mode = self.hybrid_tracker.track(
                 frame=frame,
@@ -308,15 +390,15 @@ class InteractiveKalmanAITracker:
                     self.state = "RE-ACQUIRED (FULL-FRAME YOLO)"
                     self.selected_label = det.label
                 elif track_mode == "HYBRID_FAST_GLOBAL":
-                    self.state = "RE-ACQUIRED (FULL-FRAME FAST)"
+                    self.state = f"RE-ACQUIRED (FULL-FRAME {algo_tag})"
                 else:
-                    self.state = "TRACKING (HYBRID FAST 3-PT)"
+                    self.state = f"TRACKING (HYBRID {algo_tag} {self.num_points}-PT)"
             else:
                 self.state = "OCCLUDED / LOST (PREDICTING)"
 
         else:
             # Standard AI / Template tracking with full-frame recovery fallback
-            is_custom_roi = ("FAST Custom ROI" in self.selected_label or "Target Object" in self.selected_label)
+            is_custom_roi = ("Custom ROI" in self.selected_label or "Target Object" in self.selected_label)
 
             # Try YOLO candidate match only if tracking a semantic AI class (not a custom texture ROI)
             if not is_custom_roi:
@@ -336,8 +418,8 @@ class InteractiveKalmanAITracker:
                     polygon = best_cand.polygon
                     self.state = "TRACKING" if min_dist < 80.0 else "RE-ACQUIRED (YOLO)"
 
-            # If no YOLO match, run FAST template matching with full-frame recovery
-            if meas_com is None:
+            # If no YOLO match, run feature template matching ONLY if helper is enabled
+            if meas_com is None and not self.disable_helper:
                 det = self.fast_tracker.track(frame, expected_pos=(pred_x, pred_y), enable_full_frame_search=True)
                 if det is not None:
                     meas_com = det.center_of_mass
@@ -348,6 +430,9 @@ class InteractiveKalmanAITracker:
                 else:
                     # No visual confirmation: rely 100% on Kalman Filter Dead Reckoning
                     self.state = "OCCLUDED / LOST (PREDICTING)"
+            elif meas_com is None:
+                # Helper disabled: strictly dead-reckoning prediction
+                self.state = "OCCLUDED / LOST (PREDICTING)"
 
         # 3. Kalman Update (retains kinematic constant-velocity dead reckoning if meas_com is None)
         est_x, est_y, est_vx, est_vy = self.kalman.update(meas_com)
@@ -390,13 +475,13 @@ class InteractiveKalmanAITracker:
         )
 
         # Draw active user-drawn rectangle in real-time (rubber-band) across all states
-        if drawing_roi is not None:
+        if drawing_roi is not None and self.allow_region_definition:
             dbx, dby, dbw, dbh = drawing_roi
             overlay = vis.copy()
             cv2.rectangle(overlay, (dbx, dby), (dbx + dbw, dby + dbh), (0, 255, 120), -1)
             cv2.addWeighted(overlay, 0.30, vis, 0.70, 0, vis)
             cv2.rectangle(vis, (dbx, dby), (dbx + dbw, dby + dbh), (0, 255, 120), 2, cv2.LINE_AA)
-            roi_tag = f" FAST Feature ROI ({dbw}x{dbh}) "
+            roi_tag = f" {algo_tag} Feature ROI ({dbw}x{dbh}) "
             cv2.putText(vis, roi_tag, (dbx + 4, max(20, dby - 6)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 255, 120), 2, cv2.LINE_AA)
 
@@ -414,6 +499,10 @@ def run_interactive_tracking_exercise(
     target_class: Optional[str] = None,
     auto_lock: bool = False,
     hybrid_mode: bool = False,
+    feature_only: bool = False,
+    disable_helper: bool = False,
+    feature_algorithm: str = "fast",
+    num_points: int = 3,
     start_paused: bool = False,
     output_dir: Optional[Union[str, Path]] = None,
     auto_click_frame: int = 5,
@@ -428,6 +517,7 @@ def run_interactive_tracking_exercise(
     - Target class filtering (e.g. --target-class person, --class car, --class cup)
     - Dataset selection (e.g. --dataset kitti, --dataset coco, --dataset visdrone)
     - Hybrid mode (--hybrid) tracking 3 dynamically refreshed FAST features with YOLO re-acquisition
+    - Helper algorithm selection (FAST, SIFT, ORB, or --disable-helper)
     - Auto-lock mode (--auto-lock) to lock the first detected candidate without clicking
     - Keyboard quick selection (press 1-9 to lock onto candidate [1]-[9])
     - Pause & Click target selection (press Space anytime to freeze and pick an object)
@@ -448,6 +538,10 @@ def run_interactive_tracking_exercise(
         target_class: Target object class to filter (e.g. "person", "car", "bottle", "cup").
         auto_lock: If True, automatically locks onto the first detected matching candidate.
         hybrid_mode: If True, uses FAST 3-point dynamic feature tracking + YOLO re-acquisition.
+        feature_only: If True, tracks purely with visual features without YOLO.
+        disable_helper: If True, disables visual feature helper algorithm and tracks YOLO only.
+        feature_algorithm: Feature algorithm ('fast', 'sift', 'orb', 'none').
+        num_points: Number of feature keypoints (default 3).
         start_paused: If True, starts video in paused state for easy initial selection.
         output_dir: Directory for saved outputs and error logs.
         auto_click_frame: In automated/test mode, frame index at which to trigger target selection click.
@@ -465,13 +559,19 @@ def run_interactive_tracking_exercise(
     out_path.mkdir(parents=True, exist_ok=True)
 
     effective_dataset = dataset if dataset is not None else ("kitti" if (use_kitti_demo or kitti_dir is not None) else None)
+    is_kitti = bool(use_kitti_demo or kitti_dir is not None)
+    effective_feature_only = feature_only or (is_kitti and not hybrid_mode and not disable_helper)
 
     tracker = InteractiveKalmanAITracker(
         yolo_model_name=model_name,
         dataset=effective_dataset,
         target_class=target_class,
         auto_lock=auto_lock,
-        hybrid_mode=hybrid_mode
+        hybrid_mode=hybrid_mode,
+        feature_only=effective_feature_only,
+        disable_helper=disable_helper,
+        feature_algorithm=feature_algorithm,
+        num_points=num_points
     )
     csv_log_path = out_path / "interactive_error_log.csv"
     tracker.error_service.enable_csv_logging(csv_log_path)
@@ -492,26 +592,37 @@ def run_interactive_tracking_exercise(
     drawn_bbox = [None]
 
     def on_mouse(event, x, y, flags, param):
+        can_draw = tracker.allow_region_definition
         if event == cv2.EVENT_LBUTTONDOWN:
-            is_drawing_roi[0] = True
-            roi_start[0] = x
-            roi_start[1] = y
-            roi_current[0] = x
-            roi_current[1] = y
+            if can_draw:
+                is_drawing_roi[0] = True
+                roi_start[0] = x
+                roi_start[1] = y
+                roi_current[0] = x
+                roi_current[1] = y
+            else:
+                is_drawing_roi[0] = False
         elif event == cv2.EVENT_MOUSEMOVE:
             hover_xy[0] = x
             hover_xy[1] = y
-            if is_drawing_roi[0]:
+            if is_drawing_roi[0] and can_draw:
+                roi_current[0] = x
+                roi_current[1] = y
+            elif (flags & cv2.EVENT_FLAG_LBUTTON) and can_draw:
+                if not is_drawing_roi[0]:
+                    is_drawing_roi[0] = True
+                    roi_start[0] = x
+                    roi_start[1] = y
                 roi_current[0] = x
                 roi_current[1] = y
         elif event == cv2.EVENT_LBUTTONUP:
-            if is_drawing_roi[0]:
+            if is_drawing_roi[0] and can_draw:
                 is_drawing_roi[0] = False
                 roi_current[0] = x
                 roi_current[1] = y
                 dx = abs(roi_current[0] - roi_start[0])
                 dy = abs(roi_current[1] - roi_start[1])
-                if dx >= 8 and dy >= 8:
+                if dx >= 4 and dy >= 4:
                     # User dragged a valid ROI box
                     bx = min(roi_start[0], roi_current[0])
                     by = min(roi_start[1], roi_current[1])
@@ -521,6 +632,11 @@ def run_interactive_tracking_exercise(
                     mouse_click_received[0] = True
                     click_xy[0] = x
                     click_xy[1] = y
+            else:
+                is_drawing_roi[0] = False
+                mouse_click_received[0] = True
+                click_xy[0] = x
+                click_xy[1] = y
 
     window_name = "Program 2: Interactive AI & Kalman Tracking Exercise"
     if interactive_gui:
@@ -583,14 +699,15 @@ def run_interactive_tracking_exercise(
 
                 frame = last_frame
 
-                # Handle user-drawn custom bounding box for FAST feature extraction
-                if drawn_bbox[0] is not None:
+                # Handle user-drawn custom bounding box for feature extraction
+                if drawn_bbox[0] is not None and tracker.allow_region_definition:
                     custom_box = drawn_bbox[0]
                     drawn_bbox[0] = None
-                    tracker.handle_custom_roi(custom_box, frame, label="FAST Custom ROI")
+                    tracker.handle_custom_roi(custom_box, frame)
                     if paused:
                         paused = False
-                        print(f"[Program 2] FAST ROI locked! Resuming tracking.")
+                        algo_name = tracker.feature_algorithm.upper()
+                        print(f"[Program 2] {algo_name} ROI locked! Resuming tracking.")
 
                 # Check for user mouse click (works whether running or paused!)
                 elif mouse_click_received[0]:
@@ -602,7 +719,7 @@ def run_interactive_tracking_exercise(
 
                 # Calculate live rubber-band drawing rectangle
                 active_drag_rect = None
-                if is_drawing_roi[0]:
+                if is_drawing_roi[0] and tracker.allow_region_definition:
                     rx = min(roi_start[0], roi_current[0])
                     ry = min(roi_start[1], roi_current[1])
                     rw = abs(roi_current[0] - roi_start[0])
@@ -727,14 +844,15 @@ def run_interactive_tracking_exercise(
     while frame_idx < len(frames):
         frame = frames[frame_idx]
 
-        # Handle user-drawn custom bounding box for FAST feature extraction
-        if drawn_bbox[0] is not None:
+        # Handle user-drawn custom bounding box for feature extraction
+        if drawn_bbox[0] is not None and tracker.allow_region_definition:
             custom_box = drawn_bbox[0]
             drawn_bbox[0] = None
-            tracker.handle_custom_roi(custom_box, frame, label="FAST Custom ROI")
+            tracker.handle_custom_roi(custom_box, frame)
             if paused:
                 paused = False
-                print(f"[Program 2] FAST ROI locked! Resuming tracking.")
+                algo_name = tracker.feature_algorithm.upper()
+                print(f"[Program 2] {algo_name} ROI locked! Resuming tracking.")
 
         # Check for user mouse click (can happen while running or paused!)
         elif mouse_click_received[0]:
@@ -751,7 +869,7 @@ def run_interactive_tracking_exercise(
 
         # Calculate live rubber-band drawing rectangle
         active_drag_rect = None
-        if is_drawing_roi[0]:
+        if is_drawing_roi[0] and tracker.allow_region_definition:
             rx = min(roi_start[0], roi_current[0])
             ry = min(roi_start[1], roi_current[1])
             rw = abs(roi_current[0] - roi_start[0])
@@ -828,9 +946,22 @@ def main():
     parser.add_argument("--class", "--target-class", dest="target_class", type=str, default=None,
                         help="Filter target class (e.g. 'person', 'car', 'bottle', 'cup', 'cell phone'). Default: all classes")
     parser.add_argument("--hybrid", action="store_true",
-                        help="Enable Hybrid Mode: 3-point FAST feature tracking with dynamic refresh & YOLO re-acquisition")
+                        help="Enable Hybrid Mode: feature tracking with dynamic refresh & YOLO re-acquisition")
+    parser.add_argument("--feature-only", "--no-yolo", action="store_true",
+                        help="Run strictly in Feature-Only mode (FAST/SIFT/ORB + Kalman), disabling YOLO detection")
+    parser.add_argument("--algorithm", "--feature-algo", "--algo", dest="algorithm", type=str, default="fast",
+                        choices=["fast", "sift", "orb", "none", "off", "disabled"],
+                        help="Helper feature extraction algorithm: 'fast', 'sift', 'orb', or 'none' (default: 'fast')")
+    parser.add_argument("--disable-helper", "--no-helper", "--no-feature", "--no-features", action="store_true",
+                        help="Disable visual feature helper algorithm (FAST/SIFT/ORB), running strictly with YOLO + Kalman")
+    parser.add_argument("--num-points", "--points", "-k", dest="num_points", type=int, default=3,
+                        help="Number of prominent feature keypoints to track and refresh (default: 3)")
+    parser.add_argument("--sift", action="store_true", help="Shortcut to run with SIFT feature extractor")
+    parser.add_argument("--orb", action="store_true", help="Shortcut to run with ORB feature extractor")
+    parser.add_argument("--fast", action="store_true", help="Shortcut to run with FAST feature extractor")
     parser.add_argument("--auto-lock", action="store_true", help="Automatically lock target upon first detection")
-    parser.add_argument("--paused", action="store_true", help="Start in paused mode to select target easily")
+    parser.add_argument("--paused", "--pause", dest="paused", action="store_true",
+                        help="Start in paused mode to select target easily")
     parser.add_argument("--kitti-dir", type=str, default=None, help="Path to KITTI image_02 sequence folder")
     parser.add_argument("--kitti-label", type=str, default=None, help="Path to KITTI label_02 text file")
     parser.add_argument("--kitti", action="store_true", help="Run with realistic KITTI driving street scene (1242x375)")
@@ -839,6 +970,31 @@ def main():
     args = parser.parse_args()
 
     cam_id = args.camera_id if args.camera_id is not None else (0 if args.camera else None)
+
+    # Determine if helper is disabled
+    is_helper_disabled = args.disable_helper or (args.algorithm.lower().strip() in ["none", "off", "disabled"])
+
+    # Determine active feature extraction algorithm
+    selected_algo = args.algorithm
+    if args.sift:
+        selected_algo = "sift"
+        is_helper_disabled = False
+    elif args.orb:
+        selected_algo = "orb"
+        is_helper_disabled = False
+    elif args.fast:
+        selected_algo = "fast"
+        is_helper_disabled = False
+    elif is_helper_disabled:
+        selected_algo = "none"
+
+    is_kitti = bool(args.kitti or args.kitti_dir is not None)
+
+    # In KITTI mode, default to visual feature tracking (FAST/ORB/SIFT) unless --hybrid is explicitly set
+    if is_kitti and not args.hybrid and not is_helper_disabled:
+        is_feature_only = True
+    else:
+        is_feature_only = (args.feature_only or ((args.sift or args.orb or args.fast) and not args.hybrid)) and not is_helper_disabled
 
     run_interactive_tracking_exercise(
         source=args.source,
@@ -851,6 +1007,10 @@ def main():
         target_class=args.target_class,
         auto_lock=args.auto_lock,
         hybrid_mode=args.hybrid,
+        feature_only=is_feature_only,
+        disable_helper=is_helper_disabled,
+        feature_algorithm=selected_algo,
+        num_points=args.num_points,
         start_paused=args.paused,
         output_dir=args.out,
         interactive_gui=not args.no_gui

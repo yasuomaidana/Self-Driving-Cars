@@ -70,44 +70,79 @@ class ErrorStateEKF:
 
         return self.p.copy(), self.v.copy(), self.q, self.P.copy()
 
+    def update(
+        self,
+        y: np.ndarray,
+        h_func,
+        H_jac: np.ndarray,
+        R: np.ndarray,
+        M_jac: Optional[np.ndarray] = None,
+        inject_func = None
+    ) -> Tuple[np.ndarray, np.ndarray, Quaternion, np.ndarray, float]:
+        r"""Generic Measurement Correction, State Injection, and Error Reset.
+        
+        Academic Definition:
+            1. Innovation:            \nu = y - h(x_nom)
+            2. Innovation Covariance: S  = H * P * H^T + M * R * M^T
+            3. Error Kalman Gain:     K  = P * H^T * inv(S)
+            4. Error State Estimate:  \delta x = K * \nu
+            5. State Injection:       x_nom <- x_nom \oplus \delta x
+            6. Error Reset:           \delta x <- 0
+            7. Covariance Reset:      P <- (I - K*H) * P * (I - K*H)^T + K * (M*R*M^T) * K^T
+            
+        Returns:
+            (p, v, q, P, nis): Updated state components, error covariance, and NIS.
+        """
+        y_vec = np.asarray(y, dtype=np.float64)
+        m = len(y_vec)
+        if M_jac is None:
+            M_jac = np.eye(m, dtype=np.float64)
+            
+        # 1. Innovation
+        y_pred = h_func(self.p, self.v, self.q) if callable(h_func) else h_func
+        nu = y_vec - np.asarray(y_pred, dtype=np.float64)
+        
+        # 2. Innovation Covariance
+        R_eff = M_jac @ R @ M_jac.T
+        S = H_jac @ self.P @ H_jac.T + R_eff
+        S_inv = np.linalg.inv(S)
+        nis = float(nu.T @ S_inv @ nu)
+        
+        # 3. Kalman Gain
+        K = self.P @ H_jac.T @ S_inv
+        
+        # 4. Error State Correction
+        delta_x = K @ nu
+        
+        # 5. State Injection
+        if inject_func is not None:
+            self.p, self.v, self.q = inject_func(self.p, self.v, self.q, delta_x)
+        else:
+            self.p = self.p + delta_x[0:3]
+            self.v = self.v + delta_x[3:6]
+            delta_theta = delta_x[6:9]
+            dq = Quaternion.from_rotvec(delta_theta)
+            self.q = self.q.multiply(dq)
+            
+        # 6 & 7. Covariance Reset (Joseph form for numerical stability)
+        I_KH = np.eye(9, dtype=np.float64) - K @ H_jac
+        self.P = I_KH @ self.P @ I_KH.T + K @ R_eff @ K.T
+        self.P = 0.5 * (self.P + self.P.T)
+        
+        return self.p.copy(), self.v.copy(), self.q, self.P.copy(), nis
+
     def update_gnss_position(self, p_meas: np.ndarray, r_cov: np.ndarray) -> Tuple[np.ndarray, np.ndarray, Quaternion, np.ndarray, float]:
-        r"""Low-rate GNSS position measurement correction.
+        r"""Low-rate GNSS position measurement correction (Convenience wrapper around update).
         
         Measurement model: y_k = p_meas - p_nominal = H * \delta x + v_k
         H = [I_3, 0_3x3, 0_3x3] (3x9)
-        
-        Returns:
-            (p, v, q, P, nis): Updated state, covariance, and Normalized Innovation Squared (NIS).
         """
-        # Innovation
-        y = np.asarray(p_meas, dtype=np.float64) - self.p
-        
-        # Measurement Jacobian
         H = np.zeros((3, 9), dtype=np.float64)
         H[0:3, 0:3] = np.eye(3)
-        
-        # Innovation covariance
-        S = H @ self.P @ H.T + r_cov
-        S_inv = np.linalg.inv(S)
-        nis = float(y.T @ S_inv @ y)
+        return self.update(
+            y=p_meas,
+            h_func=lambda p, v, q: p,
+            H_jac=H,
+            R=r_cov
+        )
 
-        # Kalman gain
-        K = self.P @ H.T @ S_inv
-
-        # Error state correction
-        delta_x = K @ y
-
-        # 1. State Injection
-        self.p = self.p + delta_x[0:3]
-        self.v = self.v + delta_x[3:6]
-        
-        # Quaternion correction: q = q \otimes Exp(0.5 * delta_theta)
-        delta_theta = delta_x[6:9]
-        dq = Quaternion.from_rotvec(delta_theta)
-        self.q = self.q.multiply(dq)
-
-        # 2. Covariance Update (Joseph form for numerical stability)
-        I_KH = np.eye(9, dtype=np.float64) - K @ H
-        self.P = I_KH @ self.P @ I_KH.T + K @ r_cov @ K.T
-
-        return self.p.copy(), self.v.copy(), self.q, self.P.copy(), nis

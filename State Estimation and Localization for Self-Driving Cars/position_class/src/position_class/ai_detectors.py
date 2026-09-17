@@ -251,71 +251,135 @@ class YOLODetector(BaseDetector):
         return detections
 
 
-class FastFeatureTracker:
-    """Combines FAST Corner Feature Detection + ORB matching with dynamic Center of Mass calculation.
+class VisualFeatureTracker:
+    """Multi-algorithm Visual Feature Tracker supporting FAST, SIFT, and ORB with Kalman state estimation.
     
-    Maintains and dynamically refreshes a set of the 3 most prominent FAST feature points
+    Extracts and dynamically refreshes a set of K prominent feature keypoints (default: 3)
     inside the tracked target bounding box.
     """
 
-    def __init__(self, fast_threshold: int = 15):
+    def __init__(
+        self,
+        algorithm: str = "fast",
+        num_points: int = 3,
+        fast_threshold: int = 15
+    ):
+        self.algorithm = algorithm.lower().strip()
+        self.num_points = max(1, num_points)
         self.fast_threshold = fast_threshold
-        self.fast = cv2.FastFeatureDetector_create(threshold=fast_threshold, nonmaxSuppression=True)
-        self.orb = cv2.ORB_create(nfeatures=400, edgeThreshold=5, patchSize=15)
-        self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        
+        # 1. Initialize Detectors and Matchers
+        self._init_detectors()
         
         self.target_descriptors = None
         self.target_template: Optional[np.ndarray] = None
         self.template_size: Tuple[int, int] = (60, 60)
         self.target_label: str = "Target"
-        self.fast_points: List[Tuple[float, float]] = []  # Current coordinates of the 3 FAST features
+        self.fast_points: List[Tuple[float, float]] = []  # Current coordinates of the K features
         self.is_initialized: bool = False
+
+    def _init_detectors(self) -> None:
+        """Initialize OpenCV feature detectors, descriptor extractors, and matchers."""
+        if self.algorithm in ("none", "off", "disabled", "no", "false", ""):
+            self.algorithm = "none"
+            self.fast = None
+            self.orb = None
+            self.sift = None
+            self.matcher = None
+            self.algo_name = "NONE (Disabled)"
+            return
+
+        self.fast = cv2.FastFeatureDetector_create(threshold=self.fast_threshold, nonmaxSuppression=True)
+        self.orb = cv2.ORB_create(nfeatures=500, edgeThreshold=5, patchSize=15)
+        
+        # Try initializing SIFT if available in cv2
+        try:
+            self.sift = cv2.SIFT_create(nfeatures=500)
+        except Exception:
+            self.sift = None
+
+        if self.algorithm == "sift" and self.sift is not None:
+            self.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
+            self.algo_name = f"SIFT ({self.num_points} pts)"
+        elif self.algorithm == "orb":
+            self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+            self.algo_name = f"ORB ({self.num_points} pts)"
+        else:
+            self.algorithm = "fast"
+            self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+            self.algo_name = f"FAST ({self.num_points} pts)"
+
+    def _extract_top_k_points(
+        self,
+        roi_gray: np.ndarray,
+        origin_x: int,
+        origin_y: int,
+        k: Optional[int] = None
+    ) -> List[Tuple[float, float]]:
+        """Extract the top-k most prominent feature keypoints using the selected algorithm."""
+        k = k if k is not None else self.num_points
+        rh, rw = roi_gray.shape[:2]
+        if rh < 4 or rw < 4:
+            return []
+
+        kp = []
+        if self.algorithm == "sift" and self.sift is not None:
+            try:
+                kp = self.sift.detect(roi_gray, None)
+            except Exception:
+                kp = []
+        elif self.algorithm == "orb":
+            try:
+                kp = self.orb.detect(roi_gray, None)
+            except Exception:
+                kp = []
+        
+        # If FAST or fallback if SIFT/ORB returned 0 keypoints
+        if len(kp) == 0:
+            kp = self.fast.detect(roi_gray, None)
+
+        # Fallback to GoodFeaturesToTrack / Shi-Tomasi if fewer than k keypoints found
+        if len(kp) < k:
+            corners = cv2.goodFeaturesToTrack(roi_gray, maxCorners=max(6, k * 3), qualityLevel=0.01, minDistance=4)
+            if corners is not None and len(corners) > 0:
+                pts = [(float(origin_x + c[0][0]), float(origin_y + c[0][1])) for c in corners[:k]]
+                return pts
+
+        if len(kp) == 0:
+            # Synthetic K-point grid fallback for ultra-low texture patches
+            pts = []
+            for i in range(k):
+                frac_x = (i + 1.0) / (k + 1.0)
+                frac_y = 0.50 if (i % 2 == 0) else 0.35
+                pts.append((float(origin_x + rw * frac_x), float(origin_y + rh * frac_y)))
+            return pts
+
+        # Sort keypoints by corner response score descending
+        sorted_kp = sorted(kp, key=lambda p: float(p.response), reverse=True)
+        top_k = sorted_kp[:k]
+
+        # Convert to global frame coordinates
+        pts = [(float(origin_x + p.pt[0]), float(origin_y + p.pt[1])) for p in top_k]
+
+        # If we had fewer than k points, pad with remaining positions
+        pad_idx = 0
+        while len(pts) < k:
+            frac_x = ((pad_idx + 1) % k) / max(1.0, float(k))
+            frac_y = 0.50
+            pts.append((float(origin_x + rw * frac_x), float(origin_y + rh * frac_y)))
+            pad_idx += 1
+
+        return pts[:k]
 
     def _extract_top_k_fast_points(
         self,
         roi_gray: np.ndarray,
         origin_x: int,
         origin_y: int,
-        k: int = 3
+        k: Optional[int] = None
     ) -> List[Tuple[float, float]]:
-        """Extract the top-k most prominent FAST corner features within the ROI."""
-        rh, rw = roi_gray.shape[:2]
-        if rh < 4 or rw < 4:
-            return []
-
-        # 1. Detect FAST keypoints
-        kp = self.fast.detect(roi_gray, None)
-        
-        # 2. Fallback to GoodFeaturesToTrack / ORB if fewer than k FAST corners found
-        if len(kp) < k:
-            corners = cv2.goodFeaturesToTrack(roi_gray, maxCorners=k * 3, qualityLevel=0.01, minDistance=4)
-            if corners is not None and len(corners) > 0:
-                pts = [(float(origin_x + c[0][0]), float(origin_y + c[0][1])) for c in corners[:k]]
-                return pts
-
-        if len(kp) == 0:
-            # Synthetic 3-point grid fallback for low-texture patches
-            return [
-                (float(origin_x + rw * 0.25), float(origin_y + rh * 0.25)),
-                (float(origin_x + rw * 0.75), float(origin_y + rh * 0.25)),
-                (float(origin_x + rw * 0.50), float(origin_y + rh * 0.75)),
-            ]
-
-        # 3. Sort keypoints by corner response score descending
-        sorted_kp = sorted(kp, key=lambda p: float(p.response), reverse=True)
-        top_k = sorted_kp[:k]
-
-        # Convert to global frame coordinates
-        pts = [(float(origin_x + p.pt[0]), float(origin_y + p.pt[1])) for p in top_k]
-        
-        # If we had 1 or 2 points, pad with remaining positions
-        while len(pts) < k:
-            if len(pts) == 1:
-                pts.append((float(origin_x + rw * 0.75), float(origin_y + rh * 0.50)))
-            elif len(pts) == 2:
-                pts.append((float(origin_x + rw * 0.50), float(origin_y + rh * 0.75)))
-
-        return pts[:k]
+        """Backward-compatible alias for _extract_top_k_points."""
+        return self._extract_top_k_points(roi_gray, origin_x, origin_y, k=k)
 
     def refresh_features(
         self,
@@ -323,10 +387,10 @@ class FastFeatureTracker:
         bbox: Tuple[int, int, int, int],
         alpha: float = 0.20
     ) -> List[Tuple[float, float]]:
-        """Dynamically refresh the target template and 3 prominent FAST feature points.
+        """Dynamically refresh the target template and K prominent feature points.
         
         Uses an Exponential Moving Average (EMA) for the appearance template to adapt
-        to illumination and perspective changes, and re-extracts the 3 sharpest FAST corners.
+        to illumination and perspective changes, and re-extracts the K sharpest feature points.
         """
         bx, by, bw, bh = bbox
         fh, fw = frame.shape[:2]
@@ -350,8 +414,8 @@ class FastFeatureTracker:
                 self.target_template = curr_roi.copy()
                 self.template_size = (x2 - x1, y2 - y1)
 
-            # 2. Refresh the 3 FAST feature points
-            self.fast_points = self._extract_top_k_fast_points(curr_roi, x1, y1, k=3)
+            # 2. Refresh the K feature points
+            self.fast_points = self._extract_top_k_points(curr_roi, x1, y1, k=self.num_points)
 
         return self.fast_points
 
@@ -390,13 +454,21 @@ class FastFeatureTracker:
 
         roi = gray[y1:y2, x1:x2]
 
-        kp = self.fast.detect(roi, None)
-        if len(kp) == 0:
-            kp = self.orb.detect(roi, None)
+        # Extract descriptors
+        desc = None
+        if self.algorithm == "sift" and self.sift is not None:
+            _, desc = self.sift.detectAndCompute(roi, None)
+        elif self.algorithm == "orb":
+            _, desc = self.orb.detectAndCompute(roi, None)
         
-        kp, desc = self.orb.compute(roi, kp)
         if desc is None or len(desc) == 0:
-            kp, desc = self.orb.detectAndCompute(roi, None)
+            kp = self.fast.detect(roi, None) if self.fast is not None else []
+            if len(kp) == 0 and self.orb is not None:
+                kp = self.orb.detect(roi, None)
+            if self.orb is not None:
+                kp, desc = self.orb.compute(roi, kp)
+                if desc is None or len(desc) == 0:
+                    _, desc = self.orb.detectAndCompute(roi, None)
 
         self.target_descriptors = desc
         self.target_template = roi.copy()
@@ -404,8 +476,8 @@ class FastFeatureTracker:
         self.target_label = label
         self.is_initialized = True
 
-        # Extract initial set of 3 FAST feature points
-        self.fast_points = self._extract_top_k_fast_points(roi, x1, y1, k=3)
+        # Extract initial set of K feature points
+        self.fast_points = self._extract_top_k_points(roi, x1, y1, k=self.num_points)
 
         poly = [(float(x1), float(y1)), (float(x1 + bw), float(y1)),
                 (float(x1 + bw), float(y1 + bh)), (float(x1), float(y1 + bh))]
@@ -417,6 +489,7 @@ class FastFeatureTracker:
             polygon=poly,
             fast_points=list(self.fast_points)
         )
+
 
     def track(
         self,
@@ -470,18 +543,13 @@ class FastFeatureTracker:
                     
                     bbox = (best_x, best_y, tw, th)
 
-                    # Dynamically refresh the 3 FAST features on high-confidence frames
+                    # Dynamically refresh the K feature points on high-confidence frames
                     if auto_refresh and max_val >= 0.65:
                         self.refresh_features(frame, bbox, alpha=0.20)
                     else:
-                        if len(self.fast_points) == 3:
-                            shift_x = best_x - (cx - tw / 2.0)
-                            shift_y = best_y - (cy - th / 2.0)
-                            self.fast_points = [(p[0] + shift_x, p[1] + shift_y) for p in self.fast_points]
-                        else:
-                            self.fast_points = self._extract_top_k_fast_points(
-                                gray[best_y:best_y+th, best_x:best_x+tw], best_x, best_y, k=3
-                            )
+                        self.fast_points = self._extract_top_k_points(
+                            gray[best_y:best_y+th, best_x:best_x+tw], best_x, best_y, k=self.num_points
+                        )
 
                     return DetectionResult(
                         bbox=bbox,
@@ -506,9 +574,9 @@ class FastFeatureTracker:
                         (float(best_x + tw), float(best_y + th)), (float(best_x), float(best_y + th))]
                 bbox = (best_x, best_y, tw, th)
 
-                # Re-extract the 3 FAST points at the newly discovered location
-                self.fast_points = self._extract_top_k_fast_points(
-                    gray[best_y:best_y+th, best_x:best_x+tw], best_x, best_y, k=3
+                # Re-extract the K feature points at the newly discovered location
+                self.fast_points = self._extract_top_k_points(
+                    gray[best_y:best_y+th, best_x:best_x+tw], best_x, best_y, k=self.num_points
                 )
                 if auto_refresh and g_max_val >= 0.65:
                     self.refresh_features(frame, bbox, alpha=0.25)
@@ -525,24 +593,37 @@ class FastFeatureTracker:
         return None
 
 
+# Backward-compatible alias
+FastFeatureTracker = VisualFeatureTracker
+
+
 class HybridTracker:
-    """Hybrid Object Tracker synergizing 3-Point FAST Feature Tracking + Full-Frame YOLO Re-acquisition.
+    """Hybrid Object Tracker synergizing K-Point Feature Tracking (FAST/SIFT/ORB) + Full-Frame YOLO Re-acquisition.
     
     Architecture:
-    1. Primary Track: High-frequency FAST 3-point corner tracking with dynamic appearance refresh.
+    1. Primary Track: High-frequency K-point feature tracking with dynamic appearance refresh.
     2. Covariance-Adaptive Search Gating: Search radius dynamically expands with Kalman uncertainty.
-    3. Full-Frame Scan & YOLO Semantic Recovery: When FAST confidence drops or occlusion occurs,
-       scans the entire frame (no artificial radius cutoff) to re-acquire the target anywhere in the picture!
+    3. Full-Frame Scan & YOLO Semantic Recovery: When feature confidence drops or occlusion occurs,
+       scans the entire frame to re-acquire the target anywhere in the picture!
     """
 
     def __init__(
         self,
         yolo_detector: Optional[YOLODetector] = None,
+        feature_algorithm: str = "fast",
+        num_points: int = 3,
         fast_threshold: int = 15,
         yolo_model_name: str = "yolov8n.pt",
         dataset: Optional[str] = None
     ):
-        self.fast_tracker = FastFeatureTracker(fast_threshold=fast_threshold)
+        self.feature_tracker = VisualFeatureTracker(
+            algorithm=feature_algorithm,
+            num_points=num_points,
+            fast_threshold=fast_threshold
+        )
+        self.fast_tracker = self.feature_tracker  # backward compatibility
+        self.feature_algorithm = feature_algorithm
+        self.num_points = num_points
         self.yolo_detector = yolo_detector if yolo_detector is not None else YOLODetector(model_name=yolo_model_name, dataset=dataset)
         self.target_label: str = "Target"
         self.target_class: Optional[str] = None
@@ -606,31 +687,33 @@ class HybridTracker:
             self.last_track_mode = "HYBRID_FAST"
             return fast_det, "HYBRID_FAST"
 
-        # 3. Stage B: Full-Frame YOLO Semantic Re-Acquisition (Scans whole picture!)
-        reacq_candidates = self.yolo_detector.detect_all(frame, target_class=active_class)
-        best_cand: Optional[DetectionResult] = None
-        min_dist = float("inf")
+        # 3. Stage B: Full-Frame YOLO Semantic Re-Acquisition (Scans whole picture for semantic AI classes)
+        is_custom_fast = ("FAST" in self.target_label or "Target Object" in self.target_label)
+        if not is_custom_fast:
+            reacq_candidates = self.yolo_detector.detect_all(frame, target_class=active_class)
+            best_cand: Optional[DetectionResult] = None
+            min_dist = float("inf")
 
-        # Scan ALL candidates across the whole frame, prioritizing the one closest to last known trajectory
-        for c in reacq_candidates:
-            ccx, ccy = c.center_of_mass
-            dist = float(np.hypot(ccx - pred_x, ccy - pred_y))
-            if dist < min_dist:
-                min_dist = dist
-                best_cand = c
+            # Scan ALL candidates across the whole frame, prioritizing the one closest to last known trajectory
+            for c in reacq_candidates:
+                ccx, ccy = c.center_of_mass
+                dist = float(np.hypot(ccx - pred_x, ccy - pred_y))
+                if dist < min_dist:
+                    min_dist = dist
+                    best_cand = c
 
-        if best_cand is not None:
-            # Re-seed FAST features and dynamic template at new YOLO location anywhere in frame
-            re_det = self.fast_tracker.init_target(
-                frame=frame,
-                click_pos=(int(best_cand.center_of_mass[0]), int(best_cand.center_of_mass[1])),
-                bbox=best_cand.bbox,
-                label=best_cand.label
-            )
-            re_det.confidence = best_cand.confidence
-            self.target_label = best_cand.label
-            self.last_track_mode = "HYBRID_REACQUIRED_YOLO"
-            return re_det, "HYBRID_REACQUIRED_YOLO"
+            if best_cand is not None:
+                # Re-seed FAST features and dynamic template at new YOLO location anywhere in frame
+                re_det = self.fast_tracker.init_target(
+                    frame=frame,
+                    click_pos=(int(best_cand.center_of_mass[0]), int(best_cand.center_of_mass[1])),
+                    bbox=best_cand.bbox,
+                    label=best_cand.label
+                )
+                re_det.confidence = best_cand.confidence
+                self.target_label = best_cand.label
+                self.last_track_mode = "HYBRID_REACQUIRED_YOLO"
+                return re_det, "HYBRID_REACQUIRED_YOLO"
 
         # 4. Stage C: Full-Frame FAST Template Search (Scans whole picture if YOLO didn't trigger)
         fast_global = self.fast_tracker.track(
