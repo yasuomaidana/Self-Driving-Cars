@@ -146,3 +146,109 @@ class ErrorStateEKF:
             R=r_cov
         )
 
+
+class ErrorStateKalmanFilter:
+    """Generic Multi-Dimensional Error-State Extended Kalman Filter (ES-EKF).
+    
+    Maintains nominal kinematic state x_nom and error-state covariance P.
+    Provides generic predict (propagate) and update methods completely decoupled
+    from specific physical sensors or vehicle dimensions.
+    """
+
+    def __init__(self, x0: np.ndarray, P0: np.ndarray):
+        self.x_nom = np.asarray(x0, dtype=np.float64).reshape(-1, 1)
+        self.P = np.asarray(P0, dtype=np.float64)
+        self.n = self.x_nom.shape[0]
+
+        self.latest_innovation: Optional[np.ndarray] = None
+        self.latest_innovation_cov: Optional[np.ndarray] = None
+        self.latest_gain: Optional[np.ndarray] = None
+
+    def predict(
+        self,
+        f_nom_func,
+        F_jac: np.ndarray,
+        Q: np.ndarray,
+        u: Optional[np.ndarray] = None,
+        L_jac: Optional[np.ndarray] = None
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Executes High-Rate Nominal State Propagation & Error Covariance Propagation:
+            check_x_nom = f_nom(hat_x_nom, u)
+            check_P = F_delta * hat_P * F_delta^T + L * Q * L^T
+        """
+        if u is not None:
+            self.x_nom = f_nom_func(self.x_nom, u).reshape(-1, 1)
+        else:
+            try:
+                self.x_nom = f_nom_func(self.x_nom).reshape(-1, 1)
+            except TypeError:
+                self.x_nom = f_nom_func(self.x_nom, None).reshape(-1, 1)
+
+        if L_jac is None:
+            L_jac = np.eye(self.n)
+
+        self.P = F_jac @ self.P @ F_jac.T + L_jac @ Q @ L_jac.T
+        return self.x_nom.copy(), self.P.copy()
+
+    # Alias matching strapdown dead-reckoning terminology
+    propagate = predict
+
+    def update(
+        self,
+        y: np.ndarray,
+        h_func,
+        H_jac: np.ndarray,
+        R: np.ndarray,
+        M_jac: Optional[np.ndarray] = None,
+        inject_func=None,
+        angle_indices: Optional[List[int]] = None
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Executes Generic Measurement Update, Nominal Injection, and Error Reset:
+            1. Innovation:            nu = y - h(check_x_nom)
+            2. Innovation Covariance: S  = H * check_P * H^T + M * R * M^T
+            3. Error Kalman Gain:     K  = check_P * H^T * inv(S)
+            4. Error Correction:      delta_x = K * nu
+            5. State Injection:       hat_x_nom = check_x_nom (oplus) delta_x
+            6. Error Reset:           delta_x <- 0
+            7. Covariance Reset:      hat_P = (I - K*H) * check_P * (I - K*H)^T + K * R_eff * K^T
+        """
+        y_vec = np.asarray(y, dtype=np.float64).reshape(-1, 1)
+        m = y_vec.shape[0]
+        if M_jac is None:
+            M_jac = np.eye(m, dtype=np.float64)
+
+        # 1. Innovation residual
+        y_pred = h_func(self.x_nom).reshape(-1, 1) if callable(h_func) else np.asarray(h_func, dtype=np.float64).reshape(-1, 1)
+        nu = y_vec - y_pred
+        if angle_indices is not None:
+            for idx in angle_indices:
+                nu[idx, 0] = float((nu[idx, 0] + np.pi) % (2 * np.pi) - np.pi)
+
+        # 2. Innovation Covariance
+        R_eff = M_jac @ R @ M_jac.T
+        S = H_jac @ self.P @ H_jac.T + R_eff
+
+        # 3. Optimal Error Kalman Gain
+        K = self.P @ H_jac.T @ np.linalg.inv(S)
+
+        # 4. Error State Estimate
+        delta_x = K @ nu
+
+        # 5. Nominal State Injection
+        if inject_func is not None:
+            self.x_nom = inject_func(self.x_nom, delta_x).reshape(-1, 1)
+        else:
+            self.x_nom = (self.x_nom + delta_x).reshape(-1, 1)
+
+        # 6 & 7. Covariance Reset (Joseph form for numerical stability)
+        I_KH = np.eye(self.n, dtype=np.float64) - K @ H_jac
+        self.P = I_KH @ self.P @ I_KH.T + K @ R_eff @ K.T
+        self.P = 0.5 * (self.P + self.P.T)
+
+        self.latest_innovation = nu
+        self.latest_innovation_cov = S
+        self.latest_gain = K
+
+        return self.x_nom.copy(), self.P.copy()
+
+

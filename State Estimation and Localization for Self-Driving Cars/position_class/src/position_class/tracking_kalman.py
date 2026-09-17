@@ -31,11 +31,98 @@ class KalmanTrackState:
     is_detected: bool
 
 
-class KalmanTracker2D:
+def build_cv_matrices_2d(
+    dt: float = 1.0 / 30.0,
+    process_noise_std: float = 1.0,
+    measurement_noise_std: float = 2.0,
+    initial_covariance: float = 50.0,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Didactic builder for 2D Constant Velocity (CV) Kalman filter matrices.
+
+    Follows the Day 01 & Day 02 State Estimation framework:
+    -------------------------------------------------------
+    State vector (n=4):
+        x = [p_x, p_y, v_x, v_y]^T
+        where (p_x, p_y) is object Center of Mass in image coordinates (pixels),
+        and (v_x, v_y) is image plane velocity (pixels/second).
+
+    Measurement vector (m=2):
+        y = [p_x_meas, p_y_meas]^T
+
+    1. State Transition Matrix F (4x4):
+        p_x(k) = p_x(k-1) + dt * v_x(k-1)
+        p_y(k) = p_y(k-1) + dt * v_y(k-1)
+        v_x(k) = v_x(k-1)
+        v_y(k) = v_y(k-1)
+        F = [[1, 0, dt, 0],
+             [0, 1, 0, dt],
+             [0, 0, 1,  0],
+             [0, 0, 0,  1]]
+
+    2. Measurement Matrix H (2x4):
+        Directly observes position components:
+        H = [[1, 0, 0, 0],
+             [0, 1, 0, 0]]
+
+    3. Process Noise Covariance Q (4x4):
+        Continuous White Noise Acceleration (CWNA) discretization:
+        q_pos = (dt^3 / 3) * sigma_a^2
+        q_vel = dt * sigma_a^2
+        q_pv  = (dt^2 / 2) * sigma_a^2
+
+    4. Measurement Noise Covariance R (2x2):
+        R = diag(sigma_meas^2, sigma_meas^2)
+
+    5. Initial State Covariance P0 (4x4):
+        P0 = diag(initial_cov, initial_cov, initial_cov, initial_cov)
+
+    Returns:
+        Tuple of (F, H, Q, R, P0)
+    """
+    dt = float(dt)
+    sigma_a = float(process_noise_std)
+    sigma_meas = float(measurement_noise_std)
+
+    F = np.array([
+        [1.0, 0.0, dt,  0.0],
+        [0.0, 1.0, 0.0, dt ],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0]
+    ], dtype=np.float64)
+
+    H = np.array([
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0]
+    ], dtype=np.float64)
+
+    q_pos = (dt**3) / 3.0 * (sigma_a**2)
+    q_vel = dt * (sigma_a**2)
+    q_pv = (dt**2) / 2.0 * (sigma_a**2)
+    Q = np.array([
+        [q_pos, 0.0,   q_pv,  0.0  ],
+        [0.0,   q_pos, 0.0,   q_pv ],
+        [q_pv,  0.0,   q_vel, 0.0  ],
+        [0.0,   q_pv,  0.0,   q_vel]
+    ], dtype=np.float64)
+
+    R = np.eye(2, dtype=np.float64) * (sigma_meas**2)
+    P0 = np.eye(4, dtype=np.float64) * float(initial_covariance)
+
+    return F, H, Q, R, P0
+
+
+from .base_kalman_tracker import BaseKalmanTracker2D
+
+
+class KalmanTracker2D(BaseKalmanTracker2D):
     """2D Constant Velocity Kalman Filter for tracking object Center of Mass.
 
-    State vector: x = [x, y, vx, vy]^T
-    Measurement:  z = [x, y]^T
+    State vector: x = [p_x, p_y, v_x, v_y]^T
+    Measurement:  z = [p_x, p_y]^T
+
+    Supports both:
+    1. Direct injection of fundamental system matrices: F, H, Q, R, P0, G (as taught in Day 01 & Day 02)
+    2. Automatic matrix generation from physical parameters (dt, process_noise_std, measurement_noise_std)
     """
 
     def __init__(
@@ -44,51 +131,53 @@ class KalmanTracker2D:
         process_noise_std: float = 1.0,
         measurement_noise_std: float = 2.0,
         initial_covariance: float = 50.0,
+        F: Optional[np.ndarray] = None,
+        H: Optional[np.ndarray] = None,
+        Q: Optional[np.ndarray] = None,
+        R: Optional[np.ndarray] = None,
+        P0: Optional[np.ndarray] = None,
+        G: Optional[np.ndarray] = None,
     ):
         """Initialize the 2D Kalman filter.
 
         Args:
             dt: Time step between frames in seconds.
-            process_noise_std: Standard deviation of process noise (acceleration disturbance).
+            process_noise_std: Standard deviation of process noise (acceleration disturbance in px/s^2).
             measurement_noise_std: Standard deviation of visual measurement noise (pixels).
             initial_covariance: Initial uncertainty in state estimation.
+            F: Optional custom State Transition Matrix (4x4).
+            H: Optional custom Measurement Matrix (2x4).
+            Q: Optional custom Process Noise Covariance Matrix (4x4).
+            R: Optional custom Measurement Noise Covariance Matrix (2x2).
+            P0: Optional custom Initial Error Covariance Matrix (4x4).
+            G: Optional custom Control Matrix (4 x n_u).
         """
         self.dt = float(dt)
         self.process_noise_std = float(process_noise_std)
         self.measurement_noise_std = float(measurement_noise_std)
         self.initial_cov = float(initial_covariance)
 
-        # 4D State Transition Matrix (Constant Velocity Model)
-        self.F = np.array([
-            [1.0, 0.0, self.dt, 0.0    ],
-            [0.0, 1.0, 0.0,     self.dt],
-            [0.0, 0.0, 1.0,     0.0    ],
-            [0.0, 0.0, 0.0,     1.0    ]
-        ], dtype=np.float64)
+        # Build default matrices if custom matrices are not explicitly passed
+        def_F, def_H, def_Q, def_R, def_P0 = build_cv_matrices_2d(
+            dt=self.dt,
+            process_noise_std=self.process_noise_std,
+            measurement_noise_std=self.measurement_noise_std,
+            initial_covariance=self.initial_cov
+        )
 
-        # 2x4 Measurement Matrix (Observing x, y position directly)
-        self.H = np.array([
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0, 0.0]
-        ], dtype=np.float64)
+        self.F = np.asarray(F if F is not None else def_F, dtype=np.float64)
+        self.H = np.asarray(H if H is not None else def_H, dtype=np.float64)
+        self.Q = np.asarray(Q if Q is not None else def_Q, dtype=np.float64)
+        self.R = np.asarray(R if R is not None else def_R, dtype=np.float64)
+        self.P0 = np.asarray(P0 if P0 is not None else def_P0, dtype=np.float64)
+        self.G = np.asarray(G, dtype=np.float64) if G is not None else None
 
-        # Process Noise Covariance (Continuous White Noise Acceleration discretization)
-        q_pos = (self.dt**3) / 3.0 * (self.process_noise_std**2)
-        q_vel = self.dt * (self.process_noise_std**2)
-        q_pv = (self.dt**2) / 2.0 * (self.process_noise_std**2)
-        self.Q = np.array([
-            [q_pos, 0.0,   q_pv,  0.0  ],
-            [0.0,   q_pos, 0.0,   q_pv ],
-            [q_pv,  0.0,   q_vel, 0.0  ],
-            [0.0,   q_pv,  0.0,   q_vel]
-        ], dtype=np.float64)
-
-        # Measurement Noise Covariance (2x2)
-        self.R = np.eye(2, dtype=np.float64) * (self.measurement_noise_std**2)
+        self.n = self.F.shape[0]  # State dimension (4)
+        self.m = self.H.shape[0]  # Measurement dimension (2)
 
         # State and Covariance
-        self.x = np.zeros((4, 1), dtype=np.float64)
-        self.P = np.eye(4, dtype=np.float64) * self.initial_cov
+        self.x = np.zeros((self.n, 1), dtype=np.float64)
+        self.P = self.P0.copy()
         self.initialized = False
         self.history: List[KalmanTrackState] = []
         self.step_count = 0

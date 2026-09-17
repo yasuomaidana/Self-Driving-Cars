@@ -191,6 +191,46 @@ def generate_ekf():
             "cell_type": "markdown",
             "metadata": {},
             "source": [
+                "### 🧪 Unit Test: Generic ExtendedKalmanFilter Sanity Check (with Control Input & Measurement Update)"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Sanity verification of generic ExtendedKalmanFilter class\n",
+                "dt_test = 0.1\n",
+                "f_test = lambda x, u=None: np.array([[x[0, 0] + dt_test * x[1, 0]], [x[1, 0]]])\n",
+                "F_test = np.array([[1.0, dt_test], [0.0, 1.0]])\n",
+                "Q_test = np.diag([0.01, 0.05])\n",
+                "ekf_test = ExtendedKalmanFilter(x0=np.array([10.0, 2.0]), P0=np.eye(2) * 4.0)\n",
+                "\n",
+                "# 1. Test Prediction Step\n",
+                "x_pred, P_pred = ekf_test.predict(f_func=f_test, F_jac=F_test, Q=Q_test)\n",
+                "assert x_pred.shape == (2, 1), f\"Expected shape (2, 1), got {x_pred.shape}\"\n",
+                "assert np.isclose(x_pred[0, 0], 10.2), f\"Expected pos 10.2, got {x_pred[0, 0]}\"\n",
+                "assert np.isclose(x_pred[1, 0], 2.0), f\"Expected vel 2.0, got {x_pred[1, 0]}\"\n",
+                "assert P_pred.shape == (2, 2), f\"Expected shape (2, 2), got {P_pred.shape}\"\n",
+                "assert P_pred[0, 0] > 4.0, \"Covariance must expand after prediction\"\n",
+                "\n",
+                "# 2. Test Measurement Update Step\n",
+                "h_test = lambda x: np.array([[x[0, 0]]])\n",
+                "H_test = np.array([[1.0, 0.0]])\n",
+                "R_test = np.array([[0.25]])\n",
+                "x_upd, P_upd = ekf_test.update(y=np.array([10.5]), h_func=h_test, H_jac=H_test, R=R_test)\n",
+                "assert x_upd.shape == (2, 1), f\"Expected shape (2, 1), got {x_upd.shape}\"\n",
+                "assert P_upd.shape == (2, 2), f\"Expected shape (2, 2), got {P_upd.shape}\"\n",
+                "assert P_upd[0, 0] < P_pred[0, 0], \"Covariance must decrease after update\"\n",
+                "assert np.all(np.linalg.eigvals(P_upd) > 0), \"P must remain strictly positive definite!\"\n",
+                "print('✅ ExtendedKalmanFilter generic class unit tests passed!')"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
                 "---\n",
                 "## 4. Automotive Application: 2D Polar Radar Tracking\n",
                 "\n",
@@ -308,6 +348,55 @@ def generate_ekf():
                 "    ])\n",
                 "\n",
                 "print('Automotive motion and radar sensor models defined.')"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "### 🧪 Unit Test: 2D Polar Radar Kinematics & Jacobians Sanity Check"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Sanity verification of 2D Polar Radar Kinematics and Jacobians\n",
+                "x_test = np.array([[10.0], [0.0], [5.0], [0.0]])  # px=10, py=0, v=5, theta=0\n",
+                "u_test = np.array([[2.0], [0.5]])                  # a=2, omega=0.5\n",
+                "dt_test = 0.1\n",
+                "\n",
+                "# 1. Test Motion Model\n",
+                "x_next = motion_model(x_test, u_test, dt_test)\n",
+                "assert x_next.shape == (4, 1), f\"Expected shape (4, 1), got {x_next.shape}\"\n",
+                "assert np.isclose(x_next[0, 0], 10.5), f\"Expected px=10.5, got {x_next[0, 0]}\"\n",
+                "assert np.isclose(x_next[1, 0], 0.0), f\"Expected py=0.0, got {x_next[1, 0]}\"\n",
+                "assert np.isclose(x_next[2, 0], 5.2), f\"Expected v=5.2, got {x_next[2, 0]}\"\n",
+                "assert np.isclose(x_next[3, 0], 0.05), f\"Expected theta=0.05, got {x_next[3, 0]}\"\n",
+                "\n",
+                "# 2. Test F Jacobian\n",
+                "F_eval = get_F_jacobian(x_test, dt_test)\n",
+                "assert F_eval.shape == (4, 4), f\"Expected shape (4, 4), got {F_eval.shape}\"\n",
+                "assert np.isclose(F_eval[0, 2], dt_test), \"df1/dv must equal cos(theta)*dt\"\n",
+                "assert np.isclose(F_eval[1, 3], 5.0 * dt_test), \"df2/dtheta must equal v*cos(theta)*dt\"\n",
+                "\n",
+                "# 3. Test Measurement Model (target at (3, 4) -> r=5, phi=atan2(4,3))\n",
+                "x_radar = np.array([[3.0], [4.0], [0.0], [0.0]])\n",
+                "y_radar = measurement_model(x_radar)\n",
+                "assert y_radar.shape == (2, 1), f\"Expected shape (2, 1), got {y_radar.shape}\"\n",
+                "assert np.isclose(y_radar[0, 0], 5.0), f\"Expected range 5.0, got {y_radar[0, 0]}\"\n",
+                "assert np.isclose(y_radar[1, 0], np.arctan2(4.0, 3.0)), f\"Expected bearing {np.arctan2(4.0, 3.0)}, got {y_radar[1, 0]}\"\n",
+                "\n",
+                "# 4. Test H Jacobian\n",
+                "H_eval = get_H_jacobian(x_radar)\n",
+                "assert H_eval.shape == (2, 4), f\"Expected shape (2, 4), got {H_eval.shape}\"\n",
+                "assert np.isclose(H_eval[0, 0], 3.0 / 5.0), \"dr/dpx should be px/r = 3/5\"\n",
+                "assert np.isclose(H_eval[0, 1], 4.0 / 5.0), \"dr/dpy should be py/r = 4/5\"\n",
+                "assert np.isclose(H_eval[1, 0], -4.0 / 25.0), \"dphi/dpx should be -py/r^2 = -4/25\"\n",
+                "assert np.isclose(H_eval[1, 1], 3.0 / 25.0), \"dphi/dpy should be px/r^2 = 3/25\"\n",
+                "print('✅ 2D Radar Kinematics and Measurement Jacobians unit tests passed!')"
             ]
         },
         {
@@ -523,7 +612,9 @@ def generate_ekf():
                 "        pass  # <-- YOUR CODE HERE\n"
             ]
         },
-        cells_inst[5], # Automotive radar md
+        cells_inst[5], # Unit test md for Generic EKF
+        cells_inst[6], # Unit test code for Generic EKF
+        cells_inst[7], # Automotive radar md
         {
             "cell_type": "code",
             "execution_count": None,
@@ -551,12 +642,14 @@ def generate_ekf():
                 "    pass\n"
             ]
         },
-        cells_inst[7], # Q and R physical formulation md
-        cells_inst[8], # Sim md
-        cells_inst[9], # Sim code
-        cells_inst[10], # Plotly md
-        cells_inst[11], # Plotly code
-        cells_inst[12], # Questions md
+        cells_inst[9],  # Unit test md for Radar kinematics
+        cells_inst[10], # Unit test code for Radar kinematics
+        cells_inst[11], # Q and R physical formulation md
+        cells_inst[12], # Sim md
+        cells_inst[13], # Sim code
+        cells_inst[14], # Plotly md
+        cells_inst[15], # Plotly code
+        cells_inst[16], # Questions md
     ]
 
     save_notebook({"cells": cells_inst, "metadata": {"language_info": {"name": "python"}}, "nbformat": 4, "nbformat_minor": 5}, "Day_02_Extended_Kalman_Filter_instructor.ipynb")
@@ -578,7 +671,7 @@ def generate_ukf():
                 "\n",
                 "### 🎯 Learning Objectives:\n",
                 "1. Understand the fundamental limitation of Taylor series linearization in highly curved manifolds.\n",
-                "2. Master the **Scaled Unscented Transform (SUT)** and parameter selection ($\\alpha, \\beta, \\kappa$).\n",
+                "2. Master the **Standard Non-Scaled Unscented Transform (UT)** and parameter $\\kappa$.\n",
                 "3. Implement the generic multi-dimensional `UnscentedKalmanFilter` class via robust Cholesky matrix decomposition and circular angle mean unwrapping.\n",
                 "4. Benchmark UKF vs. EKF on high-rate turning maneuvers with severe polar bearing nonlinearities.\n",
                 "5. Visualize covariance confidence bounds and residual convergence via interactive Plotly dashboards."
@@ -611,31 +704,47 @@ def generate_ukf():
             "metadata": {},
             "source": [
                 "---\n",
-                "## 2. Mathematical Foundation: The Scaled Unscented Transform (SUT)\n",
+                "## 2. Mathematical Foundation: The Unscented Kalman Filter (UKF)\n",
                 "\n",
-                "The UKF replaces analytical Jacobian approximations with **deterministic sampling**:\n",
-                "\n",
-                "$$\\lambda = \\alpha^2(L + \\kappa) - L, \\quad \\gamma = \\sqrt{L + \\lambda}$$\n",
+                "We can easily use the Unscented Transform in our Kalman Filtering framework with nonlinear models:\n",
                 "\n",
                 "$$\\begin{aligned}\n",
-                "W_m^{(0)} &= \\frac{\\lambda}{L + \\lambda}, \\quad &W_c^{(0)} &= \\frac{\\lambda}{L + \\lambda} + (1 - \\alpha^2 + \\beta) \\\\[4pt]\n",
-                "W_m^{(i)} &= \\frac{1}{2(L + \\lambda)}, \\quad &W_c^{(i)} &= \\frac{1}{2(L + \\lambda)} \\quad (i = 1, \\dots, 2L)\n",
+                "\\textbf{Nonlinear motion model:} \\quad &\\mathbf{x}_k = \\mathbf{f}_{k-1}(\\mathbf{x}_{k-1},\\mathbf{u}_{k-1},\\mathbf{w}_{k-1}), \\quad \\mathbf{w}_k \\sim \\mathcal{N}(\\mathbf{0},\\mathbf{Q}_k) \\\\[6pt]\n",
+                "\\textbf{Nonlinear measurement model:} \\quad &\\mathbf{y}_k = \\mathbf{h}_k(\\mathbf{x}_k,\\mathbf{v}_k), \\quad \\mathbf{v}_k \\sim \\mathcal{N}(\\mathbf{0},\\mathbf{R}_k)\n",
                 "\\end{aligned}$$\n",
                 "\n",
-                "Sigma Points via Cholesky decomposition $\\mathbf{L}\\mathbf{L}^T = \\mathbf{P}$:\n",
-                "$$\\boldsymbol{\\mathcal{X}}^{(0)} = \\boldsymbol{\\mu}, \\quad \\boldsymbol{\\mathcal{X}}^{(i)} = \\boldsymbol{\\mu} + \\gamma \\operatorname{col}_i(\\mathbf{L}), \\quad \\boldsymbol{\\mathcal{X}}^{(i+L)} = \\boldsymbol{\\mu} - \\gamma \\operatorname{col}_i(\\mathbf{L})$$\n",
+                "Instead of approximating system equations by linearizing, we calculate sigma points and use the Unscented Transform to propagate the probability density functions directly!\n",
                 "\n",
-                "### 🔁 Discrete UKF Recursive Algorithm:\n",
+                "### 1️⃣ Prediction Step\n",
+                "To propagate the state from time $(k-1)$ to time $k$, apply the Unscented Transform using the current estimate $(\\mathbf{\\hat{x}}_{k-1}, \\mathbf{\\hat{P}}_{k-1})$:\n",
                 "\n",
-                "1. **Time Update (Prediction)**:\n",
-                "   $$\\boldsymbol{\\mathcal{X}}_{k|k-1}^{(i)} = \\mathbf{f}(\\boldsymbol{\\mathcal{X}}_{k-1}^{(i)}, \\mathbf{u}_{k-1})$$\n",
-                "   $$\\check{\\mathbf{x}}_k = \\sum_{i=0}^{2L} W_m^{(i)} \\boldsymbol{\\mathcal{X}}_{k|k-1}^{(i)}, \\quad \\check{\\mathbf{P}}_k = \\sum_{i=0}^{2L} W_c^{(i)} (\\boldsymbol{\\mathcal{X}}_{k|k-1}^{(i)} - \\check{\\mathbf{x}}_k)(\\boldsymbol{\\mathcal{X}}_{k|k-1}^{(i)} - \\check{\\mathbf{x}}_k)^T + \\mathbf{Q}_{k-1}$$\n",
+                "1. **Compute $2N+1$ Sigma Points:**\n",
+                "   $$\\mathbf{\\hat{L}}_{k-1}\\mathbf{\\hat{L}}_{k-1}^T = \\mathbf{\\hat{P}}_{k-1}$$\n",
+                "   $$\\mathbf{\\hat{x}}_{k-1}^{(0)} = \\mathbf{\\hat{x}}_{k-1}$$\n",
+                "   $$\\mathbf{\\hat{x}}_{k-1}^{(i)} = \\mathbf{\\hat{x}}_{k-1} + \\sqrt{N+\\kappa}\\,\\operatorname{col}_i(\\mathbf{\\hat{L}}_{k-1}) \\quad (i=1,\\dots,N)$$\n",
+                "   $$\\mathbf{\\hat{x}}_{k-1}^{(i+N)} = \\mathbf{\\hat{x}}_{k-1} - \\sqrt{N+\\kappa}\\,\\operatorname{col}_i(\\mathbf{\\hat{L}}_{k-1}) \\quad (i=1,\\dots,N)$$\n",
                 "\n",
-                "2. **Measurement Update (Correction)**:\n",
-                "   $$\\boldsymbol{\\mathcal{Y}}_{k|k-1}^{(i)} = \\mathbf{h}(\\boldsymbol{\\mathcal{X}}_{k|k-1}^{(i)})$$\n",
-                "   $$\\check{\\mathbf{y}}_k = \\sum_{i=0}^{2L} W_m^{(i)} \\boldsymbol{\\mathcal{Y}}_{k|k-1}^{(i)}, \\quad \\mathbf{S}_k = \\sum_{i=0}^{2L} W_c^{(i)} (\\boldsymbol{\\mathcal{Y}}_{k|k-1}^{(i)} - \\check{\\mathbf{y}}_k)(\\boldsymbol{\\mathcal{Y}}_{k|k-1}^{(i)} - \\check{\\mathbf{y}}_k)^T + \\mathbf{R}_k$$\n",
-                "   $$\\mathbf{P}_{xy, k} = \\sum_{i=0}^{2L} W_c^{(i)} (\\boldsymbol{\\mathcal{X}}_{k|k-1}^{(i)} - \\check{\\mathbf{x}}_k)(\\boldsymbol{\\mathcal{Y}}_{k|k-1}^{(i)} - \\check{\\mathbf{y}}_k)^T$$\n",
-                "   $$\\mathbf{K}_k = \\mathbf{P}_{xy, k}\\mathbf{S}_k^{-1}, \\quad \\hat{\\mathbf{x}}_k = \\check{\\mathbf{x}}_k + \\mathbf{K}_k(\\mathbf{y}_k - \\check{\\mathbf{y}}_k), \\quad \\hat{\\mathbf{P}}_k = \\check{\\mathbf{P}}_k - \\mathbf{K}_k \\mathbf{S}_k \\mathbf{K}_k^T$$"
+                "2. **Propagate Sigma Points through Motion Model:**\n",
+                "   $$\\mathbf{\\check{x}}_k^{(i)} = \\mathbf{f}_{k-1}(\\mathbf{\\hat{x}}_{k-1}^{(i)}, \\mathbf{u}_{k-1}, \\mathbf{0}) \\quad (i=0,\\dots,2N)$$\n",
+                "\n",
+                "3. **Compute Predicted Mean and Covariance:**\n",
+                "   With non-scaled weights $\\alpha^{(i)}$:\n",
+                "   $$\\alpha^{(0)} = \\frac{\\kappa}{N+\\kappa}, \\quad \\alpha^{(i)} = \\frac{1}{2(N+\\kappa)} \\quad (i=1,\\dots,2N)$$\n",
+                "   $$\\mathbf{\\check{x}}_k = \\sum_{i=0}^{2N} \\alpha^{(i)}\\mathbf{\\check{x}}_k^{(i)}, \\quad \\mathbf{\\check{P}}_k = \\sum_{i=0}^{2N} \\alpha^{(i)}(\\mathbf{\\check{x}}_k^{(i)} - \\mathbf{\\check{x}}_k)(\\mathbf{\\check{x}}_k^{(i)} - \\mathbf{\\check{x}}_k)^T + \\mathbf{Q}_{k-1}$$\n",
+                "\n",
+                "### 2️⃣ Correction / Measurement Update Step\n",
+                "\n",
+                "1. **Propagate Sigma Points through Measurement Model:**\n",
+                "   $$\\mathbf{\\hat{y}}_k^{(i)} = \\mathbf{h}_k(\\mathbf{\\check{x}}_k^{(i)}, \\mathbf{0}) \\quad (i=0,\\dots,2N)$$\n",
+                "\n",
+                "2. **Compute Predicted Measurement and Innovation Covariance:**\n",
+                "   $$\\mathbf{\\hat{y}}_k = \\sum_{i=0}^{2N} \\alpha^{(i)}\\mathbf{\\hat{y}}_k^{(i)}, \\quad \\mathbf{P}_y = \\sum_{i=0}^{2N} \\alpha^{(i)}(\\mathbf{\\hat{y}}_k^{(i)} - \\mathbf{\\hat{y}}_k)(\\mathbf{\\hat{y}}_k^{(i)} - \\mathbf{\\hat{y}}_k)^T + \\mathbf{R}_k$$\n",
+                "\n",
+                "3. **Compute Cross-Covariance:**\n",
+                "   $$\\mathbf{P}_{xy} = \\sum_{i=0}^{2N} \\alpha^{(i)}(\\mathbf{\\check{x}}_k^{(i)} - \\mathbf{\\check{x}}_k)(\\mathbf{\\hat{y}}_k^{(i)} - \\mathbf{\\hat{y}}_k)^T$$\n",
+                "\n",
+                "4. **Optimal Kalman Gain & Posterior State Update:**\n",
+                "   $$\\mathbf{K}_k = \\mathbf{P}_{xy}\\mathbf{P}_y^{-1}, \\quad \\mathbf{\\hat{x}}_k = \\mathbf{\\check{x}}_k + \\mathbf{K}_k(\\mathbf{y}_k - \\mathbf{\\hat{y}}_k), \\quad \\mathbf{\\hat{P}}_k = \\mathbf{\\check{P}}_k - \\mathbf{K}_k \\mathbf{P}_y \\mathbf{K}_k^T$$"
             ]
         },
         {
@@ -657,37 +766,35 @@ def generate_ukf():
                 "    return (angle + np.pi) % (2 * np.pi) - np.pi\n",
                 "\n",
                 "class UnscentedKalmanFilter:\n",
-                "    \"\"\"Generic Multi-Dimensional Unscented Kalman Filter (UKF) with Scaled Unscented Transform.\n",
+                "    \"\"\"Generic Multi-Dimensional Unscented Kalman Filter (UKF) with Standard Non-Scaled UT.\n",
                 "    \n",
-                "    Completely derivative-free state estimation supporting arbitrary dimension L, nonlinear\n",
+                "    Completely derivative-free state estimation supporting arbitrary dimension N, nonlinear\n",
                 "    transition functions f(x, u), observation models h(x), and robust angle unwrapping.\n",
                 "    \"\"\"\n",
                 "    \n",
-                "    def __init__(self, x0: np.ndarray, P0: np.ndarray, alpha=0.5, beta=2.0, kappa=0.0):\n",
+                "    def __init__(self, x0: np.ndarray, P0: np.ndarray, kappa: float = 0.0):\n",
                 "        self.x = np.asarray(x0, dtype=np.float64).reshape(-1, 1)\n",
                 "        self.P = np.asarray(P0, dtype=np.float64)\n",
-                "        self.L = self.x.shape[0]\n",
+                "        self.N = self.x.shape[0]\n",
+                "        self.L = self.N\n",
+                "        self.kappa = float(kappa)\n",
                 "        \n",
-                "        self.alpha, self.beta, self.kappa = alpha, beta, kappa\n",
-                "        self.lambda_ = self.alpha**2 * (self.L + self.kappa) - self.L\n",
-                "        self.gamma = np.sqrt(self.L + self.lambda_)\n",
-                "        self.num_sigmas = 2 * self.L + 1\n",
+                "        self.gamma = np.sqrt(self.N + self.kappa)\n",
+                "        self.num_sigmas = 2 * self.N + 1\n",
                 "        \n",
-                "        # Merwe Scaled Weights\n",
-                "        self.Wm = np.zeros(self.num_sigmas)\n",
-                "        self.Wc = np.zeros(self.num_sigmas)\n",
-                "        self.Wm[0] = self.lambda_ / (self.L + self.lambda_)\n",
-                "        self.Wc[0] = self.Wm[0] + (1.0 - self.alpha**2 + self.beta)\n",
-                "        for i in range(1, self.num_sigmas):\n",
-                "            self.Wm[i] = 1.0 / (2.0 * (self.L + self.lambda_))\n",
-                "            self.Wc[i] = self.Wm[i]\n",
+                "        # Standard Non-Scaled Weights alpha^(i)\n",
+                "        denom = self.N + self.kappa\n",
+                "        self.alpha_weights = np.full(self.num_sigmas, 1.0 / (2.0 * denom))\n",
+                "        self.alpha_weights[0] = self.kappa / denom\n",
+                "        self.Wm = self.alpha_weights\n",
+                "        self.Wc = self.alpha_weights\n",
                 "            \n",
                 "        self.latest_innovation = None\n",
                 "        self.latest_innovation_cov = None\n",
                 "        self.latest_gain = None\n",
                 "            \n",
                 "    def generate_sigma_points(self, x_mean: np.ndarray, P_cov: np.ndarray, angle_indices: list = None):\n",
-                "        \"\"\"Generates 2L+1 sigma points via robust Cholesky decomposition L = chol(P).\"\"\"\n",
+                "        \"\"\"Generates 2N+1 sigma points via robust Cholesky decomposition L = chol(P).\"\"\"\n",
                 "        P_sym = 0.5 * (P_cov + P_cov.T)\n",
                 "        try:\n",
                 "            L_mat = np.linalg.cholesky(P_sym)\n",
@@ -697,12 +804,12 @@ def generate_ukf():
                 "            P_sym = eigvecs @ np.diag(eigvals) @ eigvecs.T\n",
                 "            L_mat = np.linalg.cholesky(P_sym)\n",
                 "            \n",
-                "        sigmas = np.zeros((self.L, self.num_sigmas))\n",
+                "        sigmas = np.zeros((self.N, self.num_sigmas))\n",
                 "        sigmas[:, 0] = x_mean.flatten()\n",
-                "        for i in range(self.L):\n",
+                "        for i in range(self.N):\n",
                 "            col = L_mat[:, i]\n",
                 "            sigmas[:, i + 1] = x_mean.flatten() + self.gamma * col\n",
-                "            sigmas[:, i + 1 + self.L] = x_mean.flatten() - self.gamma * col\n",
+                "            sigmas[:, i + 1 + self.N] = x_mean.flatten() - self.gamma * col\n",
                 "        if angle_indices is not None:\n",
                 "            for idx in angle_indices:\n",
                 "                sigmas[idx, :] = wrap_angle(sigmas[idx, :])\n",
@@ -720,8 +827,8 @@ def generate_ukf():
                 "                sigmas_pred[:, i:i+1] = f_func(sp).reshape(-1, 1)\n",
                 "            \n",
                 "        # Recombine mean with circular angle unwrapping\n",
-                "        x_pred = np.zeros((self.L, 1))\n",
-                "        for row in range(self.L):\n",
+                "        x_pred = np.zeros((self.N, 1))\n",
+                "        for row in range(self.N):\n",
                 "            if angle_indices is not None and row in angle_indices:\n",
                 "                ref = sigmas_pred[row, 0]\n",
                 "                unwrapped = ref + wrap_angle(sigmas_pred[row, :] - ref)\n",
@@ -729,7 +836,7 @@ def generate_ukf():
                 "            else:\n",
                 "                x_pred[row, 0] = np.sum(self.Wm * sigmas_pred[row, :])\n",
                 "                \n",
-                "        P_pred = np.zeros((self.L, self.L))\n",
+                "        P_pred = np.zeros((self.N, self.N))\n",
                 "        for i in range(self.num_sigmas):\n",
                 "            diff = sigmas_pred[:, i:i+1] - x_pred\n",
                 "            if angle_indices is not None:\n",
@@ -763,7 +870,7 @@ def generate_ukf():
                 "                y_pred[row, 0] = np.sum(self.Wm * gamma_meas[row, :])\n",
                 "                \n",
                 "        Py = np.zeros((m, m))\n",
-                "        Pxy = np.zeros((self.L, m))\n",
+                "        Pxy = np.zeros((self.N, m))\n",
                 "        for i in range(self.num_sigmas):\n",
                 "            dy = gamma_meas[:, i:i+1] - y_pred\n",
                 "            if meas_angle_indices is not None:\n",
@@ -804,6 +911,59 @@ def generate_ukf():
             "cell_type": "markdown",
             "metadata": {},
             "source": [
+                "### 🧪 Unit Test: Generic UnscentedKalmanFilter Sanity Check (Sigma Points, Propagation & Update)"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Sanity verification of generic UnscentedKalmanFilter class\n",
+                "x0_t = np.array([[10.0], [2.0]])\n",
+                "P0_t = np.eye(2) * 4.0\n",
+                "ukf_t = UnscentedKalmanFilter(x0=x0_t, P0=P0_t, kappa=1.0)\n",
+                "\n",
+                "# 1. Test Non-Scaled Weights alpha^(i)\n",
+                "assert np.isclose(np.sum(ukf_t.alpha_weights), 1.0), 'Sum of alpha weights must equal 1.0'\n",
+                "assert np.isclose(np.sum(ukf_t.Wm), 1.0), 'Sum of Wm must equal 1.0'\n",
+                "assert ukf_t.num_sigmas == 5, f'Expected 5 sigma points for N=2, got {ukf_t.num_sigmas}'\n",
+                "assert np.isclose(ukf_t.alpha_weights[0], 1.0 / 3.0), f'Expected alpha[0]=1/3 for N=2, kappa=1, got {ukf_t.alpha_weights[0]}'\n",
+                "assert np.isclose(ukf_t.alpha_weights[1], 1.0 / 6.0), f'Expected alpha[1]=1/6 for N=2, kappa=1, got {ukf_t.alpha_weights[1]}'\n",
+                "\n",
+                "# 2. Test Sigma Point Generation\n",
+                "sigmas = ukf_t.generate_sigma_points(x0_t, P0_t)\n",
+                "assert sigmas.shape == (2, 5), f'Expected shape (2, 5), got {sigmas.shape}'\n",
+                "recon_mean = np.sum(ukf_t.Wm * sigmas, axis=1, keepdims=True)\n",
+                "assert np.allclose(recon_mean, x0_t, atol=1e-5), f'Reconstructed mean {recon_mean.T} != {x0_t.T}'\n",
+                "\n",
+                "# 3. Test Prediction Step\n",
+                "dt_t = 0.1\n",
+                "f_t = lambda x, u=None: np.array([[x[0, 0] + dt_t * x[1, 0]], [x[1, 0]]])\n",
+                "Q_t = np.diag([0.01, 0.05])\n",
+                "x_p, P_p = ukf_t.predict(f_func=f_t, Q=Q_t)\n",
+                "assert x_p.shape == (2, 1), f'Expected shape (2, 1), got {x_p.shape}'\n",
+                "assert np.isclose(x_p[0, 0], 10.2, atol=1e-4), f'Expected pos 10.2, got {x_p[0, 0]}'\n",
+                "assert np.isclose(x_p[1, 0], 2.0, atol=1e-4), f'Expected vel 2.0, got {x_p[1, 0]}'\n",
+                "assert P_p.shape == (2, 2), f'Expected shape (2, 2), got {P_p.shape}'\n",
+                "assert P_p[0, 0] > 4.0, 'Covariance must expand after prediction'\n",
+                "\n",
+                "# 4. Test Measurement Update Step\n",
+                "h_t = lambda x: np.array([[x[0, 0]]])\n",
+                "R_t = np.array([[0.25]])\n",
+                "x_u, P_u = ukf_t.update(y=np.array([[10.5]]), h_func=h_t, R=R_t)\n",
+                "assert x_u.shape == (2, 1), f'Expected shape (2, 1), got {x_u.shape}'\n",
+                "assert P_u.shape == (2, 2), f'Expected shape (2, 2), got {P_u.shape}'\n",
+                "assert P_u[0, 0] < P_p[0, 0], 'Covariance must decrease after update'\n",
+                "assert np.all(np.linalg.eigvals(P_u) > 0), 'P must remain strictly positive definite!'\n",
+                "print('✅ UnscentedKalmanFilter generic class unit tests passed!')"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
                 "---\n",
                 "## 4. Analytical Linearization (EKF) vs. Derivative-Free Sampling (UKF)\n",
                 "\n",
@@ -816,7 +976,7 @@ def generate_ukf():
                 "\n",
                 "**Why EKF degrades under severe angular rates and bearing noise:**\n",
                 "- EKF truncates the Taylor expansion at $\\mathcal{O}(\\Delta \\mathbf{x}^1)$, ignoring curvature terms $\\frac{1}{2}\\Delta\\mathbf{x}^T \\nabla^2 \\mathbf{f}\\,\\Delta\\mathbf{x}$. When $\\sigma_\\phi$ is large or yaw rates are high, the prior Gaussian is severely distorted into a non-Gaussian banana-shaped manifold.\n",
-                "- In contrast, the **UKF** propagates $2L+1 = 9$ deterministic sigma points through the exact nonlinear equations $\\mathbf{f}(\\cdot)$ and $\\mathbf{h}(\\cdot)$, capturing posterior mean and covariance with 2nd-order Taylor accuracy without evaluating any matrix of partial derivatives."
+                "- In contrast, the **UKF** propagates $2N+1 = 9$ deterministic sigma points through the exact nonlinear equations $\\mathbf{f}(\\cdot)$ and $\\mathbf{h}(\\cdot)$, capturing posterior mean and covariance with 2nd-order Taylor accuracy without evaluating any matrix of partial derivatives."
             ]
         },
         {
@@ -899,7 +1059,7 @@ def generate_ukf():
                 "P_ekf = P0_init.copy()\n",
                 "x_ekf_all = np.zeros((4, N_steps))\n",
                 "\n",
-                "ukf = UnscentedKalmanFilter(x0_init, P0_init, alpha=0.5, beta=2.0, kappa=0.0)\n",
+                "ukf = UnscentedKalmanFilter(x0_init, P0_init, kappa=0.0)\n",
                 "x_ukf_all = np.zeros((4, N_steps))\n",
                 "\n",
                 "for k in range(N_steps):\n",
@@ -1003,23 +1163,24 @@ def generate_ukf():
                 "    return (angle + np.pi) % (2 * np.pi) - np.pi\n",
                 "\n",
                 "class UnscentedKalmanFilter:\n",
-                "    \"\"\"Unscented Kalman Filter (UKF) with Scaled Unscented Transform.\"\"\"\n",
+                "    \"\"\"Unscented Kalman Filter (UKF) with Standard Non-Scaled Unscented Transform.\"\"\"\n",
                 "    \n",
-                "    def __init__(self, x0: np.ndarray, P0: np.ndarray, alpha=0.5, beta=2.0, kappa=0.0):\n",
+                "    def __init__(self, x0: np.ndarray, P0: np.ndarray, kappa: float = 0.0):\n",
                 "        self.x = np.asarray(x0, dtype=np.float64).reshape(-1, 1)\n",
                 "        self.P = np.asarray(P0, dtype=np.float64)\n",
-                "        self.L = self.x.shape[0]\n",
-                "        self.alpha, self.beta, self.kappa = alpha, beta, kappa\n",
-                "        self.lambda_ = self.alpha**2 * (self.L + self.kappa) - self.L\n",
-                "        self.gamma = np.sqrt(self.L + self.lambda_)\n",
-                "        self.num_sigmas = 2 * self.L + 1\n",
-                "        self.Wm = np.zeros(self.num_sigmas)\n",
-                "        self.Wc = np.zeros(self.num_sigmas)\n",
-                "        self.Wm[0] = self.lambda_ / (self.L + self.lambda_)\n",
-                "        self.Wc[0] = self.Wm[0] + (1.0 - self.alpha**2 + self.beta)\n",
-                "        for i in range(1, self.num_sigmas):\n",
-                "            self.Wm[i] = 1.0 / (2.0 * (self.L + self.lambda_))\n",
-                "            self.Wc[i] = self.Wm[i]\n",
+                "        self.N = self.x.shape[0]\n",
+                "        self.L = self.N\n",
+                "        self.kappa = float(kappa)\n",
+                "        \n",
+                "        self.gamma = np.sqrt(self.N + self.kappa)\n",
+                "        self.num_sigmas = 2 * self.N + 1\n",
+                "        \n",
+                "        # Standard Non-Scaled Weights alpha^(0) = kappa/(N+kappa), alpha^(i) = 1/(2(N+kappa))\n",
+                "        denom = self.N + self.kappa\n",
+                "        self.alpha_weights = np.full(self.num_sigmas, 1.0 / (2.0 * denom))\n",
+                "        self.alpha_weights[0] = self.kappa / denom\n",
+                "        self.Wm = self.alpha_weights\n",
+                "        self.Wc = self.alpha_weights\n",
                 "            \n",
                 "        self.latest_innovation = None\n",
                 "        self.latest_innovation_cov = None\n",
@@ -1027,9 +1188,9 @@ def generate_ukf():
                 "            \n",
                 "    def generate_sigma_points(self, x_mean: np.ndarray, P_cov: np.ndarray, angle_indices: list = None):\n",
                 "        # -------------------------------------------------------------------------\n",
-                "        # TODO 1.1: Implement Cholesky factorization and 2L+1 sigma points generation\n",
+                "        # TODO 1.1: Implement Cholesky factorization and 2N+1 sigma points generation\n",
                 "        # L_mat = chol(P_cov)\n",
-                "        # sigmas[:, 0] = x_mean, sigmas[:, i+1] = x_mean + gamma*L_i, sigmas[:, i+1+L] = x_mean - gamma*L_i\n",
+                "        # sigmas[:, 0] = x_mean, sigmas[:, i+1] = x_mean + gamma*L_i, sigmas[:, i+1+N] = x_mean - gamma*L_i\n",
                 "        # -------------------------------------------------------------------------\n",
                 "        pass  # <-- YOUR CODE HERE\n",
                 "        \n",
@@ -1037,8 +1198,8 @@ def generate_ukf():
                 "        # -------------------------------------------------------------------------\n",
                 "        # TODO 1.2: Implement UKF prediction step\n",
                 "        # 1. Transform sigma points through nonlinear dynamics: sigmas_pred = f(sigmas, u)\n",
-                "        # 2. Recombine mean: x_pred = sum(Wm_i * sigmas_pred_i) (use angle unwrapping for angle_indices)\n",
-                "        # 3. Recombine covariance: P_pred = sum(Wc_i * (diff @ diff.T)) + Q\n",
+                "        # 2. Recombine mean: x_pred = sum(alpha_i * sigmas_pred_i) (use angle unwrapping for angle_indices)\n",
+                "        # 3. Recombine covariance: P_pred = sum(alpha_i * (diff @ diff.T)) + Q\n",
                 "        # -------------------------------------------------------------------------\n",
                 "        pass  # <-- YOUR CODE HERE\n",
                 "        \n",
@@ -1054,12 +1215,14 @@ def generate_ukf():
                 "        pass  # <-- YOUR CODE HERE\n"
             ]
         },
-        cells_inst[5], # Benchmark noise md
-        cells_inst[6], # Benchmark challenge md
-        cells_inst[7], # Benchmark sim code
-        cells_inst[8], # Viz md
-        cells_inst[9], # Viz code
-        cells_inst[10], # Summary md
+        cells_inst[5],  # Unit test md for Generic UKF
+        cells_inst[6],  # Unit test code for Generic UKF
+        cells_inst[7],  # Benchmark noise / analytical comparison md
+        cells_inst[8],  # Benchmark challenge md
+        cells_inst[9],  # Benchmark sim code
+        cells_inst[10], # Viz md
+        cells_inst[11], # Viz code
+        cells_inst[12], # Summary md
     ]
 
     save_notebook({"cells": cells_inst, "metadata": {"language_info": {"name": "python"}}, "nbformat": 4, "nbformat_minor": 5}, "Day_02_Unscented_Kalman_Filter_instructor.ipynb")
@@ -1252,6 +1415,48 @@ def generate_eskf():
             "cell_type": "markdown",
             "metadata": {},
             "source": [
+                "### 🧪 Unit Test: Generic ErrorStateKalmanFilter Sanity Check (Nominal Propagation, Manifold Injection & Joseph Reset)"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Sanity verification of generic ErrorStateKalmanFilter class\n",
+                "x0_t = np.array([[0.0], [5.0]])\n",
+                "P0_t = np.eye(2) * 1.0\n",
+                "eskf_t = ErrorStateKalmanFilter(x0=x0_t, P0=P0_t)\n",
+                "\n",
+                "# 1. Test Prediction / Propagation Step\n",
+                "dt_t = 0.1\n",
+                "f_nom_t = lambda x, u=None: np.array([[x[0, 0] + dt_t * x[1, 0]], [x[1, 0]]])\n",
+                "F_t = np.array([[1.0, dt_t], [0.0, 1.0]])\n",
+                "Q_t = np.diag([0.01, 0.05])\n",
+                "x_p, P_p = eskf_t.predict(f_nom_func=f_nom_t, F_jac=F_t, Q=Q_t)\n",
+                "assert x_p.shape == (2, 1), f\"Expected shape (2, 1), got {x_p.shape}\"\n",
+                "assert np.isclose(x_p[0, 0], 0.5), f\"Expected pos 0.5, got {x_p[0, 0]}\"\n",
+                "assert np.isclose(x_p[1, 0], 5.0), f\"Expected vel 5.0, got {x_p[1, 0]}\"\n",
+                "assert P_p.shape == (2, 2), f\"Expected shape (2, 2), got {P_p.shape}\"\n",
+                "assert P_p[0, 0] > 1.0, \"Covariance must expand after propagation\"\n",
+                "\n",
+                "# 2. Test Measurement Update & Joseph Reset Step\n",
+                "h_t = lambda x: np.array([[x[0, 0]]])\n",
+                "H_t = np.array([[1.0, 0.0]])\n",
+                "R_t = np.array([[0.1]])\n",
+                "x_u, P_u = eskf_t.update(y=np.array([[1.0]]), h_func=h_t, H_jac=H_t, R=R_t)\n",
+                "assert x_u.shape == (2, 1), f\"Expected shape (2, 1), got {x_u.shape}\"\n",
+                "assert P_u.shape == (2, 2), f\"Expected shape (2, 2), got {P_u.shape}\"\n",
+                "assert P_u[0, 0] < P_p[0, 0], \"Covariance must decrease after update\"\n",
+                "assert np.all(np.linalg.eigvals(P_u) > 0), \"P must remain strictly positive definite!\"\n",
+                "print('✅ ErrorStateKalmanFilter generic class unit tests passed!')"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
                 "---\n",
                 "## 4. Physical Vehicle Kinematics & GNSS Observation Models\n",
                 "\n",
@@ -1366,6 +1571,60 @@ def generate_eskf():
                 "    return x_inj\n",
                 "\n",
                 "print('Physical vehicle dynamics and GNSS models compiled.')"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "### 🧪 Unit Test: Vehicle Dead-Reckoning, Error Jacobians & Manifold Injection Sanity Check"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Sanity verification of Vehicle Kinematics, Error Jacobians & Manifold Injection\n",
+                "x_test = np.array([[0.0], [0.0], [10.0], [0.0]])   # px=0, py=0, v=10, theta=0\n",
+                "u_test = np.array([[2.0], [0.1]])                   # a=2, omega=0.1\n",
+                "dt_test = 0.1\n",
+                "\n",
+                "# 1. Test Nominal Kinematic Integration\n",
+                "x_next = nominal_kinematics(x_test, u_test, dt_test)\n",
+                "assert x_next.shape == (4, 1), f\"Expected shape (4, 1), got {x_next.shape}\"\n",
+                "assert np.isclose(x_next[0, 0], 1.0), f\"Expected px=1.0, got {x_next[0, 0]}\"\n",
+                "assert np.isclose(x_next[1, 0], 0.0), f\"Expected py=0.0, got {x_next[1, 0]}\"\n",
+                "assert np.isclose(x_next[2, 0], 10.2), f\"Expected v=10.2, got {x_next[2, 0]}\"\n",
+                "assert np.isclose(x_next[3, 0], 0.01), f\"Expected theta=0.01, got {x_next[3, 0]}\"\n",
+                "\n",
+                "# 2. Test Error-State Jacobian F_delta\n",
+                "F_delta = get_error_F_jacobian(x_test, u_test, dt_test)\n",
+                "assert F_delta.shape == (4, 4), f\"Expected shape (4, 4), got {F_delta.shape}\"\n",
+                "assert np.isclose(F_delta[0, 2], dt_test), \"d(delta_px)/d(delta_v) should be dt\"\n",
+                "assert np.isclose(F_delta[1, 3], 10.0 * dt_test), \"d(delta_py)/d(delta_theta) should be v*dt\"\n",
+                "\n",
+                "# 3. Test GNSS Observation Model & Jacobian\n",
+                "y_pos = position_measurement_model(x_next)\n",
+                "assert y_pos.shape == (2, 1), f\"Expected shape (2, 1), got {y_pos.shape}\"\n",
+                "assert np.isclose(y_pos[0, 0], 1.0)\n",
+                "assert np.isclose(y_pos[1, 0], 0.0)\n",
+                "\n",
+                "H_pos = get_position_H_jacobian()\n",
+                "assert H_pos.shape == (2, 4), f\"Expected shape (2, 4), got {H_pos.shape}\"\n",
+                "assert np.allclose(H_pos, np.array([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]])), \"H should be [I_2, 0_2x2]\"\n",
+                "\n",
+                "# 4. Test Manifold Injection with Angle Wrapping\n",
+                "x_nom_test = np.array([[10.0], [5.0], [8.0], [3.10]])\n",
+                "delta_x_test = np.array([[0.2], [-0.1], [0.5], [0.10]])\n",
+                "x_injected = inject_vehicle_state(x_nom_test, delta_x_test)\n",
+                "assert x_injected.shape == (4, 1), f\"Expected shape (4, 1), got {x_injected.shape}\"\n",
+                "assert np.isclose(x_injected[0, 0], 10.2)\n",
+                "assert np.isclose(x_injected[1, 0], 4.9)\n",
+                "assert np.isclose(x_injected[2, 0], 8.5)\n",
+                "assert -np.pi <= x_injected[3, 0] <= np.pi, \"Heading angle must be wrapped to [-pi, pi]\"\n",
+                "print('✅ Vehicle Kinematics, Error Jacobians & Manifold Injection unit tests passed!')"
             ]
         },
         {
@@ -1514,8 +1773,10 @@ def generate_eskf():
             "metadata": {},
             "source": [
                 "---\n",
-                "## 8. Summary & Key Takeaways\n",
-                "The ES-EKF isolates high-frequency nonlinear kinematics in the nominal state while using linear estimation for small perturbation errors, delivering superior numerical stability and effortless handling of orientation manifolds."
+                "## 8. Analytical Check & Discussion Questions\n",
+                "\n",
+                "1. Why does the uncertainty envelope $\\pm 2\\sigma$ grow monotonically during the 10-second GNSS outage, and why does it immediately collapse upon signal return?\n",
+                "2. Why does the Error-State EKF provide superior numerical stability compared to traditional Standard EKF when integrating angular heading orientations?"
             ]
         }
     ]
@@ -1583,7 +1844,9 @@ def generate_eskf():
                 "        pass  # <-- YOUR CODE HERE\n"
             ]
         },
-        cells_inst[5], # Physical kinematics md
+        cells_inst[5], # Unit test md for Generic ES-EKF
+        cells_inst[6], # Unit test code for Generic ES-EKF
+        cells_inst[7], # Physical kinematics md
         {
             "cell_type": "code",
             "execution_count": None,
@@ -1616,19 +1879,26 @@ def generate_eskf():
                 "    pass\n"
             ]
         },
-        cells_inst[7], # Q and R physical formulation md
-        cells_inst[8], # Sim md
-        cells_inst[9], # Sim code
-        cells_inst[10], # Viz md
-        cells_inst[11], # Viz code
-        cells_inst[12], # Summary md
+        cells_inst[9],  # Unit test md for Vehicle kinematics
+        cells_inst[10], # Unit test code for Vehicle kinematics
+        cells_inst[11], # Q and R physical formulation md
+        cells_inst[12], # Sim md
+        cells_inst[13], # Sim code
+        cells_inst[14], # Viz md
+        cells_inst[15], # Viz code
+        cells_inst[16], # Summary md
     ]
 
     save_notebook({"cells": cells_inst, "metadata": {"language_info": {"name": "python"}}, "nbformat": 4, "nbformat_minor": 5}, "Day_02_Error_State_Kalman_Filter_instructor.ipynb")
     save_notebook({"cells": cells_stud, "metadata": {"language_info": {"name": "python"}}, "nbformat": 4, "nbformat_minor": 5}, "Day_02_Error_State_Kalman_Filter_student.ipynb")
 
 
-if __name__ == "__main__":
+def generate_all_day2_notebooks():
     generate_ekf()
     generate_ukf()
     generate_eskf()
+
+
+if __name__ == "__main__":
+    generate_all_day2_notebooks()
+
