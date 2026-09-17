@@ -13,13 +13,17 @@ dependencies = [
     "nbformat>=5.11.1",
     "numpy>=2.5.3",
     "opencv-python>=5.0.0.93",
-    "plotly>=7.0.0",
+    "plotly>=7.1.0",
     "polars>=1.44.2",
     "scipy>=1.18.1",
+    "pytest>=9.1.1",
+    "ultralytics>=8.4.154",
 ]
 
 [project.scripts]
 position-class = "position_class:main"
+track-json = "position_class.tracking_exercise_json:main"
+track-interactive = "position_class.interactive_tracking_exercise:main"
 
 [build-system]
 requires = ["uv_build>=0.12.6,<0.13.0"]
