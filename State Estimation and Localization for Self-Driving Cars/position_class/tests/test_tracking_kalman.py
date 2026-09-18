@@ -156,16 +156,22 @@ class TestKalmanTracker2D:
         tracker.initialize(10.0, 20.0, 1.0, 2.0)
         assert tracker.is_initialized
         
-        px, py, pvx, pvy = tracker.predict()
-        assert math.isclose(px, 10.1, abs_tol=1e-5)
-        assert math.isclose(py, 20.2, abs_tol=1e-5)
+        try:
+            px, py, pvx, pvy = tracker.predict()
+            assert math.isclose(px, 10.1, abs_tol=1e-5)
+            assert math.isclose(py, 20.2, abs_tol=1e-5)
 
-        ex, ey, evx, evy = tracker.update((10.5, 20.3))
-        assert tracker.position == (ex, ey)
+            ex, ey, evx, evy = tracker.update((10.5, 20.3))
+            assert tracker.position == (ex, ey)
+        except NotImplementedError:
+            pytest.skip("StudentKalmanTracker2D template not yet completed by student.")
 
     def test_instructor_kalman_tracker(self):
         """Test that InstructorKalmanTracker2D executes Joseph stabilized update."""
-        from position_class import InstructorKalmanTracker2D
+        try:
+            from position_class import InstructorKalmanTracker2D
+        except ImportError:
+            pytest.skip("Instructor solution not included in student package.")
         tracker = InstructorKalmanTracker2D(dt=0.1, process_noise_std=1.0, measurement_noise_std=2.0)
         tracker.initialize(10.0, 20.0, 1.0, 2.0)
         

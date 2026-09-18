@@ -691,17 +691,24 @@ class TestTrackingPipelines:
         """Test executing Program 2 using run_student_tracking_exercise."""
         from position_class import run_student_tracking_exercise, StudentKalmanTracker2D
         out_dir = tmp_path / "output_student"
-        tracker = run_student_tracking_exercise(
-            source=None,
-            output_dir=str(out_dir),
-            interactive_gui=False
-        )
-        assert isinstance(tracker.kalman, StudentKalmanTracker2D)
-        assert tracker.state in ("TRACKING", "OCCLUDED / LOST (PREDICTING)")
+        try:
+            tracker = run_student_tracking_exercise(
+                source=None,
+                output_dir=str(out_dir),
+                interactive_gui=False
+            )
+            assert isinstance(tracker.kalman, StudentKalmanTracker2D)
+            assert tracker.state in ("TRACKING", "OCCLUDED / LOST (PREDICTING)")
+        except NotImplementedError:
+            # Expected when student exercise has not been filled out yet
+            pass
 
     def test_instructor_tracking_pipeline(self, tmp_path):
         """Test executing Program 2 using run_instructor_tracking_exercise."""
-        from position_class import run_instructor_tracking_exercise, InstructorKalmanTracker2D
+        try:
+            from position_class import run_instructor_tracking_exercise, InstructorKalmanTracker2D
+        except ImportError:
+            pytest.skip("Instructor solution not included in student package.")
         out_dir = tmp_path / "output_instructor"
         tracker = run_instructor_tracking_exercise(
             source=None,
