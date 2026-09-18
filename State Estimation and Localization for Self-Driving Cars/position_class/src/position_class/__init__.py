@@ -86,10 +86,13 @@ from .student_tracking_exercise import (
     StudentKalmanTracker2D,
     run_student_tracking_exercise,
 )
-from .instructor_tracking_exercise import (
-    InstructorKalmanTracker2D,
-    run_instructor_tracking_exercise,
-)
+try:
+    from .instructor_tracking_exercise import (
+        InstructorKalmanTracker2D,
+        run_instructor_tracking_exercise,
+    )
+except ImportError:
+    pass
 from .inertial_navigation import (
     Quaternion,
     StrapdownIMUIntegrator,
@@ -98,6 +101,7 @@ from .inertial_navigation import (
 )
 from .es_ekf import (
     ErrorStateEKF,
+    ErrorStateKalmanFilter,
 )
 
 __all__ = [
@@ -160,6 +164,7 @@ __all__ = [
     "solve_gnss_trilateration",
     "skew_symmetric",
     "ErrorStateEKF",
+    "ErrorStateKalmanFilter",
 ]
 
 
