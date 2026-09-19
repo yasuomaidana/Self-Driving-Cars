@@ -16,11 +16,11 @@ $$\left. \frac{\partial \bm{f}_{k-1}}{\partial\bm{x}_{k-1}} \right|_{\hat{\bm{x}
 \left. \frac{\partial \bm{f}_{k-1}}{\partial\bm{w}_{k-1}} \right|_{\hat{\bm{x}}_{k-1},\bm{u}_{k-1},0} =\bm{L}_{k-1} $$
 
 Linearized measurement model
-$$\bm{y}_k=\bm{h}_{k}\left(\bm{x}_{k},\bm{v}_{k}\right)\approx \bm{h}_{k} \left(\check{\bm{x}}_{k},0\right)+\left. \frac{\partial \bm{h}_{k}}{\partial\bm{x}_{k-1}} \right|_{\check{\bm{x}}_{k},0} \left(\bm{x}_{k}-\check{\bm{x}}_{k} \right)+
-\left. \frac{\partial \bm{h}_{k}}{\partial\bm{v}_{k}} \right|_{\hat{\bm{x}}_{k},0} \bm{v}_{k}
+$$\bm{y}_k=\bm{h}_{k}\left(\bm{x}_{k},\bm{v}_{k}\right)\approx \bm{h}_{k} \left(\check{\bm{x}}_{k},0\right)+\left. \frac{\partial \bm{h}_{k}}{\partial\bm{x}_{k}} \right|_{\check{\bm{x}}_{k},0} \left(\bm{x}_{k}-\check{\bm{x}}_{k} \right)+
+\left. \frac{\partial \bm{h}_{k}}{\partial\bm{v}_{k}} \right|_{\check{\bm{x}}_{k},0} \bm{v}_{k}
 $$
-$$\left. \frac{\partial \bm{h}_{k}}{\partial\bm{x}_{k-1}} \right|_{\check{\bm{x}}_{k},0} =\bm{H}_{k} \quad\quad
-\left. \frac{\partial \bm{h}_{k}}{\partial\bm{v}_{k}} \right|_{\hat{\bm{x}}_{k},0} =\bm{M}_{k} $$
+$$\left. \frac{\partial \bm{h}_{k}}{\partial\bm{x}_{k}} \right|_{\check{\bm{x}}_{k},0} =\bm{H}_{k} \quad\quad
+\left. \frac{\partial \bm{h}_{k}}{\partial\bm{v}_{k}} \right|_{\check{\bm{x}}_{k},0} =\bm{M}_{k} $$
 
 We now have a linear system in state-space! The matrices $\bm{F}_{k-1}$, $\bm{L}_{k-1}$, $\bm{H}_{k}$, and $\bm{M}_{k}$ are
 called the Jacobian matrices of the system.
@@ -293,18 +293,86 @@ $$\bm{P}_{xy}=\sum_{i=0}^{2N}\alpha^{(i)}(\bm{\check{x}}_k^{(i)}-\bm{\check{x}}_
 $$\bm{K}_k=\bm{P}_{xy}\bm{P}_{y}^{-1}$$
 
 4. Compute corrected mean and covariance
-$$\bm{\hat{x}}_k=\check{\bm{x}}_k=\bm{K}_k(\bm{y}_k-\bm{\hat{y}}_k)$$
-$$\bm{\hat{P}}_k=\check{\bm{P}}_k-\bm{K}_k\bm{P}_y\bm{K}_k^T$$
+$$\bm{\hat{x}}_k = \check{\bm{x}}_k + \bm{K}_k(\bm{y}_k - \bm{\hat{y}}_k)$$
+$$\bm{\hat{P}}_k = \check{\bm{P}}_k - \bm{K}_k \bm{P}_y \bm{K}_k^T$$
 
->$\bm{R}_{k}$ Additive measurement noise
+> $\bm{R}_{k}$: Additive measurement noise covariance matrix, $\bm{P}_y = \bm{S}_k$: Innovation covariance matrix.
 
-### UKF | Short example
-![example p1](./example%20p1.jpg)
-![ukf example p2](./UTF%20Example%201.jpg)
-![ukf example p3](./UTF%20Example%202.jpg)
-![ukf example p4](./UTF%20Example%203.jpg)
-![ukf example p5](./UTF%20Example%204.jpg)
-![ukf example p6](./UTF%20Example%205.jpg)
+---
+
+### Detailed Step-by-Step UKF Example: 2D Radar Landmark Tracking
+
+To understand every computation in practice, let's walk through a concrete numerical example of the UKF measurement update step for a 2D position state observed by a polar radar sensor.
+
+#### 1. Problem Formulation
+* **State vector ($L = 2$):** $\bm{x} = \begin{bmatrix} x \\ y \end{bmatrix}$ (Position in Cartesian coordinates).
+* **Prior state estimate & covariance:**
+  $$\check{\bm{x}}_k = \begin{bmatrix} 10.0 \\ 0.0 \end{bmatrix} \text{ m}, \quad \check{\bm{P}}_k = \begin{bmatrix} 1.0 & 0.0 \\ 0.0 & 4.0 \end{bmatrix}$$
+* **Nonlinear measurement model $\bm{h}(\bm{x})$ (Range & Bearing from sensor at origin):**
+  $$\bm{y} = \bm{h}(\bm{x}) + \bm{v} = \begin{bmatrix} \sqrt{x^2 + y^2} \\ \operatorname{atan2}(y, x) \end{bmatrix} + \bm{v}$$
+* **Measurement noise covariance $\bm{R}$:**
+  $$\bm{R} = \begin{bmatrix} 0.01\text{ m}^2 & 0 \\ 0 & 0.001\text{ rad}^2 \end{bmatrix}$$
+* **Actual sensor measurement received:**
+  $$\bm{y}_k = \begin{bmatrix} 10.2\text{ m} \\ 0.05\text{ rad} \end{bmatrix}$$
+
+---
+
+#### 2. UT Parameters and Weights
+For state dimension $L = 2$, choose standard parameter $\kappa = 3 - L = 1$, $\gamma = \sqrt{L + \kappa} = \sqrt{3} \approx 1.73205$.
+Number of sigma points: $2L + 1 = 5$.
+
+Weights:
+* Center weight: $\alpha^{(0)} = \frac{\kappa}{L + \kappa} = \frac{1}{3} \approx 0.3333$
+* Outer weights ($i = 1, \dots, 4$): $\alpha^{(i)} = \frac{1}{2(L + \kappa)} = \frac{1}{6} \approx 0.1667$
+
+---
+
+#### 3. Generating the Sigma Points
+1. **Cholesky decomposition:** $\bm{L}\bm{L}^T = \check{\bm{P}}_k \implies \bm{L} = \begin{bmatrix} 1.0 & 0.0 \\ 0.0 & 2.0 \end{bmatrix}$
+2. **Sigma points $\boldsymbol{\mathcal{X}}^{(i)}$:**
+   * $\boldsymbol{\mathcal{X}}^{(0)} = \check{\bm{x}}_k = \begin{bmatrix} 10.0 \\ 0.0 \end{bmatrix}$
+   * $\boldsymbol{\mathcal{X}}^{(1)} = \check{\bm{x}}_k + \sqrt{3} \begin{bmatrix} 1.0 \\ 0.0 \end{bmatrix} = \begin{bmatrix} 11.732 \\ 0.0 \end{bmatrix}$
+   * $\boldsymbol{\mathcal{X}}^{(2)} = \check{\bm{x}}_k + \sqrt{3} \begin{bmatrix} 0.0 \\ 2.0 \end{bmatrix} = \begin{bmatrix} 10.0 \\ 3.464 \end{bmatrix}$
+   * $\boldsymbol{\mathcal{X}}^{(3)} = \check{\bm{x}}_k - \sqrt{3} \begin{bmatrix} 1.0 \\ 0.0 \end{bmatrix} = \begin{bmatrix} 8.268 \\ 0.0 \end{bmatrix}$
+   * $\boldsymbol{\mathcal{X}}^{(4)} = \check{\bm{x}}_k - \sqrt{3} \begin{bmatrix} 0.0 \\ 2.0 \end{bmatrix} = \begin{bmatrix} 10.0 \\ -3.464 \end{bmatrix}$
+
+---
+
+#### 4. Propagating Sigma Points Through Sensor Model $\bm{h}(\cdot)$
+Pass each sigma point through $\bm{y}^{(i)} = \begin{bmatrix} \sqrt{x_i^2 + y_i^2} \\ \operatorname{atan2}(y_i, x_i) \end{bmatrix}$:
+
+1. $\boldsymbol{\mathcal{Y}}^{(0)} = \bm{h}\left(\begin{bmatrix} 10.0 \\ 0.0 \end{bmatrix}\right) = \begin{bmatrix} 10.000 \\ 0.0000 \end{bmatrix}$
+2. $\boldsymbol{\mathcal{Y}}^{(1)} = \bm{h}\left(\begin{bmatrix} 11.732 \\ 0.0 \end{bmatrix}\right) = \begin{bmatrix} 11.732 \\ 0.0000 \end{bmatrix}$
+3. $\boldsymbol{\mathcal{Y}}^{(2)} = \bm{h}\left(\begin{bmatrix} 10.0 \\ 3.464 \end{bmatrix}\right) = \begin{bmatrix} \sqrt{10^2 + 3.464^2} \\ \operatorname{atan2}(3.464, 10) \end{bmatrix} = \begin{bmatrix} 10.583 \\ 0.3335 \end{bmatrix}$
+4. $\boldsymbol{\mathcal{Y}}^{(3)} = \bm{h}\left(\begin{bmatrix} 8.268 \\ 0.0 \end{bmatrix}\right) = \begin{bmatrix} 8.268 \\ 0.0000 \end{bmatrix}$
+5. $\boldsymbol{\mathcal{Y}}^{(4)} = \bm{h}\left(\begin{bmatrix} 10.0 \\ -3.464 \end{bmatrix}\right) = \begin{bmatrix} 10.583 \\ -0.3335 \end{bmatrix}$
+
+---
+
+#### 5. Computing Predicted Measurement Mean and Innovation Covariance
+* **Predicted measurement mean $\hat{\bm{y}}_k$:**
+  $$\hat{\bm{y}}_k = \sum_{i=0}^4 \alpha^{(i)} \boldsymbol{\mathcal{Y}}^{(i)} = \frac{1}{3}\begin{bmatrix} 10.0 \\ 0 \end{bmatrix} + \frac{1}{6}\begin{bmatrix} 11.732 + 10.583 + 8.268 + 10.583 \\ 0 + 0.3335 + 0 - 0.3335 \end{bmatrix} = \begin{bmatrix} 10.194 \\ 0.0000 \end{bmatrix}$$
+  *(Notice how the non-zero cross-axis variance naturally increases predicted range mean to $10.194\text{ m}$, capturing non-linear curvature without truncation!)*
+
+* **Innovation Covariance $\bm{P}_y$ (or $\bm{S}_k$):**
+  $$\bm{P}_y = \sum_{i=0}^4 \alpha^{(i)} (\boldsymbol{\mathcal{Y}}^{(i)} - \hat{\bm{y}}_k)(\boldsymbol{\mathcal{Y}}^{(i)} - \hat{\bm{y}}_k)^T + \bm{R}$$
+  $$\bm{P}_y = \begin{bmatrix} 1.037 & 0.0 \\ 0.0 & 0.0381 \end{bmatrix}$$
+
+* **Cross-Covariance $\bm{P}_{xy}$:**
+  $$\bm{P}_{xy} = \sum_{i=0}^4 \alpha^{(i)} (\boldsymbol{\mathcal{X}}^{(i)} - \check{\bm{x}}_k)(\boldsymbol{\mathcal{Y}}^{(i)} - \hat{\bm{y}}_k)^T = \begin{bmatrix} 1.000 & 0.0 \\ 0.0 & 0.385 \end{bmatrix}$$
+
+---
+
+#### 6. Kalman Gain and State Update
+* **Kalman Gain $\bm{K}_k$:**
+  $$\bm{K}_k = \bm{P}_{xy} \bm{P}_y^{-1} = \begin{bmatrix} \frac{1.000}{1.037} & 0 \\ 0 & \frac{0.385}{0.0381} \end{bmatrix} \approx \begin{bmatrix} 0.964 & 0.0 \\ 0.0 & 10.10 \end{bmatrix}$$
+
+* **State Correction $\hat{\bm{x}}_k$:**
+  $$\bm{y}_k - \hat{\bm{y}}_k = \begin{bmatrix} 10.20 \\ 0.05 \end{bmatrix} - \begin{bmatrix} 10.194 \\ 0.00 \end{bmatrix} = \begin{bmatrix} 0.006 \\ 0.050 \end{bmatrix}$$
+  $$\hat{\bm{x}}_k = \check{\bm{x}}_k + \bm{K}_k(\bm{y}_k - \hat{\bm{y}}_k) = \begin{bmatrix} 10.0 \\ 0.0 \end{bmatrix} + \begin{bmatrix} 0.964(0.006) \\ 10.10(0.050) \end{bmatrix} = \begin{bmatrix} 10.006 \\ 0.505 \end{bmatrix}\text{ m}$$
+
+* **Updated Covariance $\hat{\bm{P}}_k$:**
+  $$\hat{\bm{P}}_k = \check{\bm{P}}_k - \bm{K}_k \bm{P}_y \bm{K}_k^T = \begin{bmatrix} 0.036 & 0.0 \\ 0.0 & 0.111 \end{bmatrix}$$
 
 ## Summary
 

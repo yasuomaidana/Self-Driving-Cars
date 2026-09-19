@@ -101,7 +101,7 @@ class StudentKalmanTracker2D(BaseKalmanTracker2D):
         if R is not None:
             self.R = np.asarray(R, dtype=np.float64)
         else:
-            self.R = None
+            self.R = np.eye(2, dtype=np.float64) * (self.measurement_noise_std ** 2)
 
         # -------------------------------------------------------------------------
         # TODO [Student Step 1.5]: Define Initial State Uncertainty Covariance P0

@@ -27,8 +27,8 @@ In self-driving cars, **Object Tracking** is the task of estimating the trajecto
 ```mermaid
 flowchart LR
     Sensors["Onboard Sensors (Radar, LiDAR, Camera)"] -->|Raw Detections| DA["Data Association & Clustering"]
-    DA -->|Associated Measurements [r, phi]| Tracker["Object Tracking Filter (EKF)"]
-    Tracker -->|Estimated State [x, y, vx, vy]| Trajectory["Obstacle Trajectory Prediction"]
+    DA -->|Associated Measurements r, phi| Tracker["Object Tracking Filter (EKF)"]
+    Tracker -->|Estimated State x, y, vx, vy| Trajectory["Obstacle Trajectory Prediction"]
     Trajectory --> Controller["Collision Avoidance & Adaptive Cruise Control"]
 ```
 

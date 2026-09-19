@@ -57,11 +57,6 @@ def run_test_student():
     sys.exit(pytest.main(["tests/test_student_tracking_exercise.py", "-k", "TestStudent", "-v"]))
 
 
-def run_test_instructor():
-    """Run Instructor reference solution unit tests."""
-    sys.exit(pytest.main(["tests/test_student_tracking_exercise.py", "-k", "TestInstructor", "-v"]))
-
-
 def run_test_all():
     """Run all exercise unit tests."""
     sys.exit(pytest.main(["tests/test_student_tracking_exercise.py", "-v"]))
