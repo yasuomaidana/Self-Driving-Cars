@@ -11,15 +11,14 @@ Where $\bm{H}$ is a Jacobian matrix.
 \frac{\partial f_m}{\partial x_1} && \dots && \frac{\partial f_m}{\partial x_n}
 \end{bmatrix}$$
 
-$$\mathcal{L}(x) = \bm{e}^T\bm{e}= (\bm{y}-\bm{H}x)^T(\bm{y}-\bm{H}x) = \bm{y}^T\bm{y}-x^T\bm{H}^T\bm{y}-\bm{y}^T\bm{H}x+x^T\bm{H}^Tx$$
+$$\mathcal{L}(x) = \bm{e}^T\bm{e}= (\bm{y}-\bm{H}x)^T(\bm{y}-\bm{H}x) = \bm{y}^T\bm{y}-x^T\bm{H}^T\bm{y}-\bm{y}^T\bm{H}x+x^T\bm{H}^T\bm{H}x$$
 
 To minimize this, we can compute the partial derivative with respect to our parameter, set to 0, and solve for an extremum:
 
-$$\left. \frac{{\partial \mathcal{L}}}{\partial x}\right|_{x=\hat{x}} = -2\bm{y}^T\bm{H} + 2\hat{x}^T\bm{H}^T\bm{H} = 0 \\
-\hat{x}_{LS}=(\bm{H}^T\bm{H})^{-1}\bm{H}^T\bm{y}$$
+$$\left. \frac{{\partial \mathcal{L}}}{\partial x}\right|_{x=\hat{x}} = -2\bm{y}^T\bm{H} + 2\hat{x}^T\bm{H}^T\bm{H} = 0 $$$$\hat{x}_{LS}=(\bm{H}^T\bm{H})^{-1}\bm{H}^T\bm{y}$$
 
 If we have $m$ measurements, and $n$ unknown parameters, then:
-$$\bm{H}\in \mathbb{R}^{m \times n} \quad \bm{H}^T\bm{H}\mathbb{R}^{n \times n}$$
+$$\bm{H}\in \mathbb{R}^{m \times n} \quad \bm{H}^T\bm{H}\in\mathbb{R}^{n \times n}$$
 
 This means that $(\bm{H}^T\bm{H})^{-1}$ exists only if there are at least as many measurements as there are unknown parameters:
 $$m\ge n$$

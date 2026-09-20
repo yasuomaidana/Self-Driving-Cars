@@ -67,8 +67,7 @@ Create a Python script or notebook in `Vehicle State Estimation on a Roadway/` a
 ```python
 import pickle
 import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+import plotly.graph_objects as go
 import sys
 
 # Ensure rotations module is accessible
@@ -127,31 +126,42 @@ print("✅ Dead reckoning integration complete!")
 Run this visualization block to compare open-loop dead reckoning against ground truth:
 
 ```python
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
 # 1. Compute Drift Error
 drift_error = np.linalg.norm(p_dr - gt.p, axis=1)
 time_axis = (imu_f.t - imu_f.t[0])
 
-# 2. Plot 3D Trajectory Comparison
-fig = plt.figure(figsize=(12, 5))
-ax1 = fig.add_subplot(121, projection='3d')
-ax1.plot(gt.p[:, 0], gt.p[:, 1], gt.p[:, 2], 'g-', linewidth=2, label='Ground Truth Path')
-ax1.plot(p_dr[:, 0], p_dr[:, 1], p_dr[:, 2], 'r--', linewidth=2, label='IMU Dead Reckoning')
-ax1.set_xlabel('Easting [m]')
-ax1.set_ylabel('Northing [m]')
-ax1.set_zlabel('Up [m]')
-ax1.set_title('3D Trajectory: True vs. Standalone IMU')
-ax1.legend()
+# 2. Interactive 3D Trajectory in Plotly
+fig_3d = go.Figure()
+fig_3d.add_trace(go.Scatter3d(x=gt.p[:, 0], y=gt.p[:, 1], z=gt.p[:, 2], mode='lines', line=dict(color='green', width=4), name='Ground Truth Path'))
+fig_3d.add_trace(go.Scatter3d(x=p_dr[:, 0], y=p_dr[:, 1], z=p_dr[:, 2], mode='lines', line=dict(color='red', width=3, dash='dash'), name='IMU Dead Reckoning'))
 
-# 3. Plot Position Error vs Time
-ax2 = fig.add_subplot(122)
-ax2.plot(time_axis, drift_error, 'r-', linewidth=2)
-ax2.set_xlabel('Time [s]')
-ax2.set_ylabel('Total Position Error [m]')
-ax2.set_title('Inertial Drift Over Time')
-ax2.grid(True)
+fig_3d.update_layout(
+    title='3D Trajectory: True vs. Standalone IMU Dead Reckoning (Plotly 3D)',
+    scene=dict(
+        xaxis_title='Easting [m]',
+        yaxis_title='Northing [m]',
+        zaxis_title='Up [m]'
+    ),
+    template='plotly_white',
+    height=550
+)
+fig_3d.show()
 
-plt.tight_layout()
-plt.show()
+# 3. Position Drift Error vs. Time in Plotly
+fig_err = go.Figure()
+fig_err.add_trace(go.Scatter(x=time_axis, y=drift_error, mode='lines', line=dict(color='red', width=2), name='Euclidean Position Error'))
+
+fig_err.update_layout(
+    title='Inertial Drift Over Time (Quadratic Divergence)',
+    xaxis_title='Time [s]',
+    yaxis_title='Total Position Error [m]',
+    template='plotly_white',
+    height=400
+)
+fig_err.show()
 
 print(f"Drift Error after 10 seconds: {drift_error[1000]:.2f} meters")
 print(f"Drift Error after 30 seconds: {drift_error[3000]:.2f} meters")

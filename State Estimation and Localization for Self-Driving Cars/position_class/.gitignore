@@ -1,0 +1,9 @@
+*.html
+*.pyc
+__pycache__/
+**/*.png
+*.pt
+**/*.json
+**/*.csv
+/tracking_output_interactive/kitti_demo/data_tracking_label_2/training/label_02/0000.txt
+/chasing.mp4

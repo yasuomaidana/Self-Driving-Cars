@@ -12,12 +12,51 @@ dependencies = [
     "jupyter>=1.1.1",
     "nbformat>=5.11.1",
     "numpy>=2.5.3",
-    "plotly>=7.0.0",
+    "opencv-python>=5.0.0.93",
+    "plotly>=7.1.0",
     "polars>=1.44.2",
+    "scipy>=1.18.1",
+    "pytest>=9.1.1",
+    "kagglehub>=1.0.2",
+    "ultralytics==8.4.155",
+    "scipy-stubs>=1.18.1.0",
 ]
 
 [project.scripts]
 position-class = "position_class:main"
+track-json = "position_class.tracking_exercise_json:main"
+track-interactive = "position_class.interactive_tracking_exercise:main"
+track-student = "position_class.student_tracking_exercise:main"
+track-sol = "position_class.instructor_tracking_exercise:main"
+track = "position_class.instructor_tracking_exercise:main"
+detection = "position_class.detection_only_exercise:main"
+
+# Granular Step-by-Step Test Commands
+test_f = "position_class.test_runner:run_test_f"
+test-f = "position_class.test_runner:run_test_f"
+test_h = "position_class.test_runner:run_test_h"
+test-h = "position_class.test_runner:run_test_h"
+test_q = "position_class.test_runner:run_test_q"
+test-q = "position_class.test_runner:run_test_q"
+test_r = "position_class.test_runner:run_test_r"
+test-r = "position_class.test_runner:run_test_r"
+test_p0 = "position_class.test_runner:run_test_p0"
+test-p0 = "position_class.test_runner:run_test_p0"
+test_matrices = "position_class.test_runner:run_test_matrices"
+test-matrices = "position_class.test_runner:run_test_matrices"
+test_predict = "position_class.test_runner:run_test_predict"
+test-predict = "position_class.test_runner:run_test_predict"
+test_update = "position_class.test_runner:run_test_update"
+test-update = "position_class.test_runner:run_test_update"
+test_dead_reckoning = "position_class.test_runner:run_test_dead_reckoning"
+test-dead-reckoning = "position_class.test_runner:run_test_dead_reckoning"
+test_student = "position_class.test_runner:run_test_student"
+test-student = "position_class.test_runner:run_test_student"
+test_all = "position_class.test_runner:run_test_all"
+test-all = "position_class.test_runner:run_test_all"
+
+test_sol = "position_class.test_runner:run_test_instructor"
+test-sol = "position_class.test_runner:run_test_instructor"
 
 [build-system]
 requires = ["uv_build>=0.12.6,<0.13.0"]

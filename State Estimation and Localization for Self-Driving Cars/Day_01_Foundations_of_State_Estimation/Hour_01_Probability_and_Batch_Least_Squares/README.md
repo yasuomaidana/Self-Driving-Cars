@@ -7,14 +7,17 @@ tags:
   - gaussians
   - math-foundations
 created: 2026-09-08
+updated: 2026-09-11
 ---
 # Hour 1: Probability, Random Variables & Batch Least Squares
 
 > [!abstract] Key Learning Objectives
 > 1. Understand why state estimation is inherently probabilistic in autonomous robotics.
 > 2. Master the algebra of multivariate Gaussian distributions and linear transformations.
-> 3. Derive the Best Linear Unbiased Estimator (BLUE) via Weighted Batch Least Squares from first principles.
-> 4. Implement a batch least-squares solver in Python to estimate physical parameters from noisy data.
+> 3. Understand where the **Observation Matrix $\mathbf{H}$** and **Error Covariance $\mathbf{P}$** come from.
+> 4. Derive the Best Linear Unbiased Estimator (BLUE) via Weighted Batch Least Squares from first principles.
+> 5. Explore four real-world automotive parameter estimation examples (Ohm's law, wheel odometry calibration, initial state tracking, LiDAR plane fitting).
+> 6. Implement a batch least-squares solver in Python to estimate physical parameters from noisy data.
 
 ---
 
@@ -26,7 +29,7 @@ Imagine an autonomous vehicle driving down a highway at $100\text{ km/h}$ ($28\t
 * Which way is it pointing? (Orientation/Attitude: roll $\phi$, pitch $\theta$, yaw $\psi$)
 
 However, a vehicle **cannot directly read its true state from reality**. Every sensor on board is imperfect:
-* **GNSS / GPS receivers** suffer from satellite clock errors, atmospheric delays, and multipath reflections (buildings bouncing signals). An off-the-shelf GPS might be off by $2\text{ to }5\text{ meters}$.
+* **GNSS / GPS receivers** suffer from satellite clock errors, atmospheric delays, and multipath reflections. An off-the-shelf GPS might be off by $2\text{ to }5\text{ meters}$.
 * **Wheel encoders (Odometry)** slip on wet asphalt or lose traction over bumps.
 * **Inertial Measurement Units (IMUs)** measure acceleration and angular rate, but constant sensor biases cause integrated positions to drift uncontrollably within seconds.
 * **LiDAR and Cameras** provide rich spatial cues, but weather, lighting, and occlusions introduce noise and false detections.
@@ -65,146 +68,110 @@ $$p(\mathbf{x}) = \frac{1}{\sqrt{(2\pi)^n \det(\mathbf{\Sigma})}} \exp\left( -\f
 
 The quadratic term in the exponent:
 $$d_M^2 = (\mathbf{x} - \boldsymbol{\mu})^T \mathbf{\Sigma}^{-1} (\mathbf{x} - \boldsymbol{\mu})$$
-is known as the **squared Mahalanobis distance**. It scales Euclidean distance by the directional uncertainty of the covariance matrix. Contours of constant probability density form **hyper-ellipsoids** centered at $\boldsymbol{\mu}$.
-
-```
-      y ^                  ...--''''--...
-        |             .-''       |        ''-.  Major Axis (Highest Uncertainty)
-        |          .-'           |            '-.
-        |        .'              |               '.
-        |       /                |                 \
-        |      |                 * \ mu             |
-        |       \                 \                /
-        |        '.                \             .'
-        |          '-.              \         .-'
-        |             '-..       ...--\....-''  Minor Axis (Lowest Uncertainty)
-        +---------------------------------------------> x
-```
+is known as the **squared Mahalanobis distance**.
 
 ### 2.3 Fundamental Property: Linear Transformations of Gaussians
-One of the primary reasons Kalman filters exist is that **linear transformations preserve Gaussianity**.
-
 > [!tip] Linear Transformation Theorem
-> If $\mathbf{x} \sim \mathcal{N}(\boldsymbol{\mu}_x, \mathbf{\Sigma}_{xx})$ and $\mathbf{y}$ is formed by a linear affine transformation:
-> $$\mathbf{y} = \mathbf{A}\mathbf{x} + \mathbf{b}$$
-> where $\mathbf{A} \in \mathbb{R}^{m \times n}$ and $\mathbf{b} \in \mathbb{R}^m$ are deterministic, then $\mathbf{y}$ is **also strictly Gaussian**:
-> $$\mathbf{y} \sim \mathcal{N}(\boldsymbol{\mu}_y, \mathbf{\Sigma}_{yy})$$
-> with:
-> $$\boldsymbol{\mu}_y = \mathbb{E}[\mathbf{A}\mathbf{x} + \mathbf{b}] = \mathbf{A}\boldsymbol{\mu}_x + \mathbf{b}$$
-> $$\mathbf{\Sigma}_{yy} = \mathbb{E}[(\mathbf{y} - \boldsymbol{\mu}_y)(\mathbf{y} - \boldsymbol{\mu}_y)^T] = \mathbf{A}\mathbf{\Sigma}_{xx}\mathbf{A}^T$$
-
-*Proof of Covariance:*
-$$\mathbf{\Sigma}_{yy} = \mathbb{E}[(\mathbf{A}\mathbf{x} + \mathbf{b} - (\mathbf{A}\boldsymbol{\mu}_x + \mathbf{b}))(\mathbf{A}\mathbf{x} + \mathbf{b} - (\mathbf{A}\boldsymbol{\mu}_x + \mathbf{b}))^T]$$
-$$\mathbf{\Sigma}_{yy} = \mathbb{E}[(\mathbf{A}(\mathbf{x} - \boldsymbol{\mu}_x))(\mathbf{A}(\mathbf{x} - \boldsymbol{\mu}_x))^T] = \mathbf{A} \underbrace{\mathbb{E}[(\mathbf{x} - \boldsymbol{\mu}_x)(\mathbf{x} - \boldsymbol{\mu}_x)^T]}_{\mathbf{\Sigma}_{xx}} \mathbf{A}^T = \mathbf{A}\mathbf{\Sigma}_{xx}\mathbf{A}^T \quad \blacksquare$$
+> If $\mathbf{x} \sim \mathcal{N}(\boldsymbol{\mu}_x, \mathbf{\Sigma}_{xx})$ and $\mathbf{y}$ is formed by a linear affine transformation $\mathbf{y} = \mathbf{A}\mathbf{x} + \mathbf{b}$, then $\mathbf{y}$ is **also strictly Gaussian**:
+> $$\mathbf{y} \sim \mathcal{N}(\mathbf{A}\boldsymbol{\mu}_x + \mathbf{b}, \mathbf{A}\mathbf{\Sigma}_{xx}\mathbf{A}^T)$$
 
 ---
 
-## 3. Batch Least Squares (BLS) Formulation
+## 3. Deep Dive: Where Does $\mathbf{H}$ Come From?
 
-Let us now solve the fundamental parameter estimation problem: given a collection of noisy sensor observations, what is the best estimate of the underlying parameter vector $\mathbf{x}$?
+In state estimation, sensors rarely measure the full state vector $\mathbf{x}$ directly. The matrix $\mathbf{H}$ is the **Measurement Matrix** (or **Observation Matrix / Measurement Jacobian**). It maps the **State Space** to the **Measurement Space**.
 
-### 3.1 Linear Measurement Model
-Suppose we collect $m$ scalar measurements relating to an unknown state $\mathbf{x} \in \mathbb{R}^n$ ($m \ge n$):
-$$\mathbf{y} = \mathbf{H}\mathbf{x} + \mathbf{v}$$
-Where:
-* $\mathbf{y} \in \mathbb{R}^m$ is the stacked vector of measurements.
-* $\mathbf{H} \in \mathbb{R}^{m \times n}$ is the observation matrix mapping state space to measurement space.
-* $\mathbf{v} \in \mathbb{R}^m$ is zero-mean measurement noise with covariance:
-  $$\mathbb{E}[\mathbf{v}] = \mathbf{0}, \quad \operatorname{Cov}(\mathbf{v}) = \mathbf{R} = \begin{bmatrix} \sigma_{v1}^2 & 0 & \dots \\ 0 & \sigma_{v2}^2 & \dots \\ \vdots & \vdots & \ddots \end{bmatrix}$$
+### Mathematical Formulation
+Let $\mathbf{x} \in \mathbb{R}^n$ be the state to estimate, and $\mathbf{y} \in \mathbb{R}^m$ be the sensor readings. Physics provides a sensor model $\mathbf{h}(\mathbf{x})$:
+$$\mathbf{y} = \mathbf{h}(\mathbf{x}) + \mathbf{v}$$
 
-### 3.2 The Weighted Squared Error Criterion
-Not all sensors are equally trustworthy. If Sensor A has noise variance $\sigma_A^2 = 0.01$ and Sensor B has variance $\sigma_B^2 = 1.0$, Sensor A should be weighted $100\times$ more heavily!
+$\mathbf{H}$ is defined as the **Jacobian matrix** of the measurement function with respect to the state:
+$$\mathbf{H} = \frac{\partial \mathbf{h}(\mathbf{x})}{\partial \mathbf{x}} = \begin{bmatrix}
+\frac{\partial h_1}{\partial x_1} & \frac{\partial h_1}{\partial x_2} & \cdots & \frac{\partial h_1}{\partial x_n} \\
+\frac{\partial h_2}{\partial x_1} & \frac{\partial h_2}{\partial x_2} & \cdots & \frac{\partial h_2}{\partial x_n} \\
+\vdots & \vdots & \ddots & \vdots \\
+\frac{\partial h_m}{\partial x_1} & \frac{\partial h_m}{\partial x_2} & \cdots & \frac{\partial h_m}{\partial x_n}
+\end{bmatrix} \in \mathbb{R}^{m \times n}$$
 
-We formulate the **Weighted Least Squares Cost Function**:
+---
+
+## 4. Four Concrete Real-World Examples of Defining $\mathbf{H}$
+
+### 🔹 Example 1: Electrical Resistance Estimation (Ohm's Law)
+* **Goal:** Estimate resistance $R$ (our state $x = R$) from current $I_i$ and voltage measurements $V_i$.
+* **Physics Law:** $V_i = I_i \cdot R + v_i \implies h_i(R) = I_i \cdot R$.
+* **Deriving $\mathbf{H}$:**
+  $$H_i = \frac{\partial h_i(R)}{\partial R} = I_i \implies \mathbf{H} = \begin{bmatrix} I_1 \\ I_2 \\ \vdots \\ I_N \end{bmatrix}, \quad \mathbf{y} = \begin{bmatrix} V_1 \\ V_2 \\ \vdots \\ V_N \end{bmatrix}$$
+
+---
+
+### 🔹 Example 2: Wheel Odometry & Effective Radius Calibration ($r_{\text{eff}}$)
+* **Goal:** Calibrate effective tire radius $r_{\text{eff}}$ from GPS linear velocity $v_{\text{gps}}$ and wheel encoder rate $\omega$.
+* **Physics Law:** $v_{\text{gps}, i} = r_{\text{eff}} \cdot \omega_i + v_i$.
+* **Deriving $\mathbf{H}$:**
+  $$\mathbf{H} = \begin{bmatrix} \omega_1 \\ \omega_2 \\ \vdots \\ \omega_N \end{bmatrix}, \quad \mathbf{y} = \begin{bmatrix} v_{\text{gps}, 1} \\ v_{\text{gps}, 2} \\ \vdots \\ v_{\text{gps}, N} \end{bmatrix} \implies \hat{r}_{\text{eff}} = (\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})^{-1}\mathbf{H}^T \mathbf{R}^{-1}\mathbf{y}$$
+
+---
+
+### 🔹 Example 3: Initial Vehicle Position and Constant Speed ($p_0, v_0$)
+* **Goal:** Estimate initial position $p_0$ and velocity $v_0$ from timed distance measurements $d_i$ at timestamps $t_i$.
+* **Physics Law:** $d_i = p_0 + v_0 t_i + v_i$.
+* **State & Observation Matrix:**
+  $$\mathbf{x} = \begin{bmatrix} p_0 \\ v_0 \end{bmatrix}, \quad \mathbf{H} = \begin{bmatrix} 1 & t_1 \\ 1 & t_2 \\ \vdots & \vdots \\ 1 & t_N \end{bmatrix}, \quad \mathbf{y} = \begin{bmatrix} d_1 \\ d_2 \\ \vdots \\ d_N \end{bmatrix}$$
+
+---
+
+### 🔹 Example 4: LiDAR Ground Surface & Road Slope Estimation ($a, b, c$)
+* **Goal:** Fit a 3D road surface plane $z = ax + by + c$ to LiDAR ground point cloud $(x_i, y_i, z_i)$.
+* **State & Observation Matrix:**
+  $$\mathbf{x} = \begin{bmatrix} a \\ b \\ c \end{bmatrix}, \quad \mathbf{H} = \begin{bmatrix} x_1 & y_1 & 1 \\ x_2 & y_2 & 1 \\ \vdots & \vdots & \vdots \\ x_N & y_N & 1 \end{bmatrix}, \quad \mathbf{y} = \begin{bmatrix} z_1 \\ z_2 \\ \vdots \\ z_N \end{bmatrix}$$
+
+---
+
+## 5. Derivation of BLUE & Where Does $\mathbf{P}$ Come From?
+
+### 5.1 Weighted Least Squares Cost Function
 $$J(\mathbf{x}) = \frac{1}{2} (\mathbf{y} - \mathbf{H}\mathbf{x})^T \mathbf{R}^{-1} (\mathbf{y} - \mathbf{H}\mathbf{x})$$
 
-Let us expand this quadratic scalar cost:
-$$J(\mathbf{x}) = \frac{1}{2} \left( \mathbf{y}^T \mathbf{R}^{-1} \mathbf{y} - \mathbf{y}^T \mathbf{R}^{-1} \mathbf{H}\mathbf{x} - \mathbf{x}^T \mathbf{H}^T \mathbf{R}^{-1} \mathbf{y} + \mathbf{x}^T \mathbf{H}^T \mathbf{R}^{-1} \mathbf{H}\mathbf{x} \right)$$
-Since $\mathbf{y}^T \mathbf{R}^{-1} \mathbf{H}\mathbf{x}$ is a scalar, it equals its transpose $\mathbf{x}^T \mathbf{H}^T \mathbf{R}^{-1} \mathbf{y}$:
-$$J(\mathbf{x}) = \frac{1}{2} \mathbf{y}^T \mathbf{R}^{-1} \mathbf{y} - \mathbf{x}^T \mathbf{H}^T \mathbf{R}^{-1} \mathbf{y} + \frac{1}{2} \mathbf{x}^T \mathbf{H}^T \mathbf{R}^{-1} \mathbf{H}\mathbf{x}$$
+Minimizing $J(\mathbf{x})$ by setting $\frac{\partial J}{\partial \mathbf{x}} = \mathbf{0}$ yields the **Normal Equations**:
+$$\hat{\mathbf{x}} = \left(\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H}\right)^{-1} \mathbf{H}^T \mathbf{R}^{-1} \mathbf{y}$$
 
-### 3.3 Derivation of the Normal Equations
-To find the state $\hat{\mathbf{x}}$ that minimizes $J(\mathbf{x})$, take the matrix derivative with respect to $\mathbf{x}$ and set it to $\mathbf{0}$:
+### 5.2 Deriving Error Covariance $\mathbf{P}$
+Let $\mathbf{e}_x = \hat{\mathbf{x}} - \mathbf{x} = (\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})^{-1} \mathbf{H}^T \mathbf{R}^{-1} \mathbf{v}$.
+$$\begin{aligned}
+\mathbf{P} &= \mathbb{E}[\mathbf{e}_x \mathbf{e}_x^T] = (\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})^{-1} \mathbf{H}^T \mathbf{R}^{-1} \underbrace{\mathbb{E}[\mathbf{v}\mathbf{v}^T]}_{\mathbf{R}} \mathbf{R}^{-1} \mathbf{H} (\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})^{-1} \\
+&= (\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})^{-1}
+\end{aligned}$$
 
-$$\frac{\partial J}{\partial \mathbf{x}} = -\mathbf{H}^T \mathbf{R}^{-1} \mathbf{y} + \mathbf{H}^T \mathbf{R}^{-1} \mathbf{H}\mathbf{x} = \mathbf{0}$$
-
-Rearranging gives the celebrated **Normal Equations**:
-$$(\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})\hat{\mathbf{x}} = \mathbf{H}^T \mathbf{R}^{-1} \mathbf{y}$$
-
-Assuming $\mathbf{H}$ has full column rank ($\operatorname{rank}(\mathbf{H}) = n$), the matrix $(\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})$ is invertible:
-
-$$\hat{\mathbf{x}}_{BLUE} = \left( \mathbf{H}^T \mathbf{R}^{-1} \mathbf{H} \right)^{-1} \mathbf{H}^T \mathbf{R}^{-1} \mathbf{y}$$
-
-### 3.4 Covariance of the Estimate
-What is the uncertainty in our estimated state $\hat{\mathbf{x}}$?
-Recall $\hat{\mathbf{x}} = \mathbf{K}_{batch} \mathbf{y}$, where $\mathbf{K}_{batch} = (\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})^{-1} \mathbf{H}^T \mathbf{R}^{-1}$.
-Using our linear transformation rule $\mathbf{\Sigma}_{yy} = \mathbf{A}\mathbf{\Sigma}_{xx}\mathbf{A}^T$:
-
-$$\mathbf{P} = \operatorname{Cov}(\hat{\mathbf{x}}) = \mathbf{K}_{batch} \operatorname{Cov}(\mathbf{y}) \mathbf{K}_{batch}^T = \mathbf{K}_{batch} \mathbf{R} \mathbf{K}_{batch}^T$$
-$$\mathbf{P} = \left( (\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})^{-1} \mathbf{H}^T \mathbf{R}^{-1} \right) \mathbf{R} \left( \mathbf{R}^{-1} \mathbf{H} (\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})^{-1} \right)$$
-Notice that $\mathbf{R}^{-1} \mathbf{R} = \mathbf{I}$:
-$$\mathbf{P} = (\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})^{-1} (\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H}) (\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})^{-1} = (\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})^{-1}$$
-
-> [!important] The Best Linear Unbiased Estimator (BLUE)
-> For any linear measurement system with zero-mean noise, the weighted least squares estimate:
-> $$\hat{\mathbf{x}} = (\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})^{-1} \mathbf{H}^T \mathbf{R}^{-1} \mathbf{y}$$
-> achieves the **minimum variance** among all possible linear unbiased estimators (Gauss-Markov Theorem). Its covariance is:
-> $$\mathbf{P} = (\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})^{-1}$$
+$$\mathbf{P} = \left(\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H}\right)^{-1}$$
 
 ---
 
-## 4. Python Implementation Walkthrough
+## 6. Cross-Disciplinary Notation Reference
 
-Let us apply this to estimate the resistance $R$ of an electrical resistor following Ohm's law ($V = R \cdot I$) using the data in `Least Squares/Excersice.ipynb`.
+| Symbol | State Estimation / Robotics | Control Theory (LTI) | Machine Learning / Statistics | Aerospace / Navigation |
+| :---: | :--- | :--- | :--- | :--- |
+| $\mathbf{H}$ | **Observation Matrix / Jacobian** | Output Matrix ($\mathbf{C}$) | Design Matrix ($\mathbf{X}$) | Measurement Matrix |
+| $\mathbf{x}$ | **State / Parameter Vector** | State ($\mathbf{x}$) | Weights / Parameters ($\mathbf{w}, \boldsymbol{\beta}$) | Ephemeris / State |
+| $\mathbf{y}$ | **Sensor Measurements** | Output ($\mathbf{y}$) | Labels / Targets ($\mathbf{y}$) | Observables |
+| $\mathbf{P}$ | **Error Covariance** | State Covariance ($\mathbf{\Sigma}_{xx}$) | Parameter Variance ($\mathbf{V}_\beta$) | Uncertainty Ellipsoid |
+| $\mathbf{R}$ | **Measurement Noise Covariance** | Sensor Noise ($\mathbf{\Sigma}_v, \mathbf{V}$) | Noise Variance ($\sigma^2 \mathbf{I}$) | Sensor Error Matrix |
+
+---
+
+## 7. Python Implementation Walkthrough
+
+All four examples are implemented and verified in [`position_class/src/position_class/least_squares.py`](file:///Users/yasuomaidana/Projects/classes/Self-Driving-Cars/State%20Estimation%20and%20Localization%20for%20Self-Driving%20Cars/position_class/src/position_class/least_squares.py):
 
 ```python
 import numpy as np
-import matplotlib.pyplot as plt
+from position_class import BatchLeastSquares, ohms_law_example, wheel_odometry_calibration_example
 
-# 1. Given measurement data (Current I in Amps, Voltage V in Volts)
-I = np.array([[0.2, 0.3, 0.4, 0.5, 0.6]]).T   # (5, 1) matrix (H)
-V = np.array([[1.23, 1.38, 2.06, 2.47, 3.17]]).T # (5, 1) observations (y)
+# 1. Run Ohm's Law example
+R_est, R_std = ohms_law_example()
+print(f"Estimated Resistance: {R_est:.4f} Ohms +/- {3*R_std:.4f} (3-sigma)")
 
-# 2. Measurement noise variance (suppose standard deviation is 0.1 V)
-sigma_v = 0.1
-R_cov = (sigma_v ** 2) * np.eye(len(I))  # (5, 5) covariance matrix
-
-# 3. Solve Normal Equations
-# x_hat = (H^T R^-1 H)^-1 H^T R^-1 y
-H = I
-R_inv = np.linalg.inv(R_cov)
-
-# Calculate state estimate and covariance
-P_est = np.linalg.inv(H.T @ R_inv @ H)
-x_hat = P_est @ (H.T @ R_inv @ V)
-
-print(f"Estimated Resistance R: {x_hat.item():.4f} Ohms")
-print(f"Estimation Uncertainty (Variance): {P_est.item():.6f}")
-print(f"Estimation 1-sigma bound: {np.sqrt(P_est.item()):.4f} Ohms")
-
-# 4. Plotting
-plt.figure(figsize=(8, 5))
-plt.scatter(I, V, color='red', label='Multimeter Measurements', zorder=5)
-I_line = np.linspace(0, 0.7, 100).reshape(-1, 1)
-V_line = I_line * x_hat.item()
-plt.plot(I_line, V_line, 'b-', label=f'Fit: V = {x_hat.item():.2f} I')
-plt.xlabel('Current (A)')
-plt.ylabel('Voltage (V)')
-plt.title('Batch Least Squares Estimation (Ohm\'s Law)')
-plt.legend()
-plt.grid(True)
-plt.show()
+# 2. Run Wheel Odometry Calibration
+r_eff, r_std = wheel_odometry_calibration_example()
+print(f"Calibrated Tire Radius: {r_eff:.4f} m +/- {3*r_std:.4f} m")
 ```
-
----
-
-## 5. Self-Assessment & Checkpoint Questions
-
-1. **Why does $\mathbf{\Sigma}_{yy} = \mathbf{A}\mathbf{\Sigma}_{xx}\mathbf{A}^T$ rather than $\mathbf{A}^2 \mathbf{\Sigma}_{xx}$?**
-   * *Answer:* Covariance is defined as $\mathbb{E}[\mathbf{e}\mathbf{e}^T]$. When $\mathbf{e}_y = \mathbf{A}\mathbf{e}_x$, the transpose of the product is $(\mathbf{A}\mathbf{e}_x)^T = \mathbf{e}_x^T \mathbf{A}^T$. Thus, $\mathbf{A}$ appears on the left and $\mathbf{A}^T$ on the right.
-
-2. **What happens if $\operatorname{rank}(\mathbf{H}) < n$?**
-   * *Answer:* $\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H}$ is singular and cannot be inverted. This represents an **unobservable system**—the sensors do not contain enough information to uniquely solve for all state dimensions (e.g., trying to solve for 3D position using only a 1D distance sensor without multiple landmarks).
-
-3. **What is the critical drawback of Batch Least Squares if we collect sensor data at $100\text{ Hz}$ for 10 minutes?**
-   * *Answer:* The matrix $\mathbf{H}$ would have $60,000$ rows. Storing and inverting $(\mathbf{H}^T \mathbf{R}^{-1} \mathbf{H})$ would require recalculating over all historical data at every single timestamp, which quickly exhausts memory and violates real-time latency limits. This directly motivates **Hour 2: Recursive Least Squares!**

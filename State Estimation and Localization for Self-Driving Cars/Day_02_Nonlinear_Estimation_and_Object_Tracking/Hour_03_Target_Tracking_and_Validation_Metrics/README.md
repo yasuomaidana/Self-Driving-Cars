@@ -27,8 +27,8 @@ In self-driving cars, **Object Tracking** is the task of estimating the trajecto
 ```mermaid
 flowchart LR
     Sensors["Onboard Sensors (Radar, LiDAR, Camera)"] -->|Raw Detections| DA["Data Association & Clustering"]
-    DA -->|Associated Measurements [r, phi]| Tracker["Object Tracking Filter (EKF)"]
-    Tracker -->|Estimated State [x, y, vx, vy]| Trajectory["Obstacle Trajectory Prediction"]
+    DA -->|Associated Measurements r, phi| Tracker["Object Tracking Filter (EKF)"]
+    Tracker -->|Estimated State x, y, vx, vy| Trajectory["Obstacle Trajectory Prediction"]
     Trajectory --> Controller["Collision Avoidance & Adaptive Cruise Control"]
 ```
 
@@ -147,45 +147,52 @@ To draw the spatial uncertainty ellipse around the target's estimated $[x, y]$ p
 
 ```python
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse
+import numpy as np
+import plotly.graph_objects as go
 
-def plot_covariance_ellipse(x, y, P_pos, ax, n_std=3.0, **kwargs):
-    """
-    Plots a covariance confidence ellipse around (x, y).
-    """
-    # 1. Eigenvalues and eigenvectors
+def create_covariance_ellipse_trace(x_c, y_c, P_pos, n_std=3.0, n_pts=100, name="3σ Uncertainty"):
+    """Generates a Plotly scatter trace of a 2D covariance ellipse."""
     eigenvals, eigenvecs = np.linalg.eigh(P_pos)
-    
-    # 2. Sort so largest eigenvalue is first
     order = eigenvals.argsort()[::-1]
-    eigenvals = eigenvals[order]
+    eigenvals = np.maximum(eigenvals[order], 1e-12)
     eigenvecs = eigenvecs[:, order]
     
-    # 3. Calculate axis lengths and tilt angle
-    angle = np.degrees(np.arctan2(eigenvecs[1, 0], eigenvecs[0, 0]))
-    width, height = 2 * n_std * np.sqrt(eigenvals)
+    # Parametric circle
+    theta = np.linspace(0, 2*np.pi, n_pts)
+    circle = np.vstack([np.cos(theta), np.sin(theta)])
     
-    # 4. Draw Ellipse
-    ellipse = Ellipse(xy=(x, y), width=width, height=height, angle=angle, **kwargs)
-    ax.add_patch(ellipse)
-    return ellipse
+    # Scale by eigenvalues and rotate by eigenvectors
+    scaling = n_std * np.sqrt(eigenvals)
+    ellipse = (eigenvecs @ (scaling[:, None] * circle))
+    
+    x_ell = x_c + ellipse[0, :]
+    y_ell = y_c + ellipse[1, :]
+    
+    return go.Scatter(
+        x=x_ell, y=y_ell,
+        mode='lines',
+        fill='toself',
+        fillcolor='rgba(255, 0, 0, 0.2)',
+        line=dict(color='red', width=2),
+        name=name
+    )
 
 # Demo plot
-fig, ax = plt.subplots(figsize=(7, 7))
 P_demo = np.array([[4.0, 2.5],
                    [2.5, 3.0]])
-plot_covariance_ellipse(10.0, 15.0, P_demo, ax, n_std=3.0, 
-                        edgecolor='red', facecolor='pink', alpha=0.4, label='$3\sigma$ Uncertainty')
-ax.scatter([10.0], [15.0], color='red', marker='x', s=100, label='Target Position')
-ax.set_xlim(0, 20)
-ax.set_ylim(5, 25)
-ax.set_xlabel('X Position (m)')
-ax.set_ylabel('Y Position (m)')
-ax.set_title('Target State 3-Sigma Covariance Ellipse')
-ax.legend()
-ax.grid(True)
-plt.show()
+
+fig_ell = go.Figure()
+fig_ell.add_trace(create_covariance_ellipse_trace(10.0, 15.0, P_demo, n_std=3.0, name="3σ Covariance Ellipse"))
+fig_ell.add_trace(go.Scatter(x=[10.0], y=[15.0], mode='markers', marker=dict(color='red', size=10, symbol='x'), name='Estimated Target Position'))
+
+fig_ell.update_layout(
+    title="Target State 3-Sigma Covariance Ellipse (Plotly)",
+    xaxis_title="X Position (m)",
+    yaxis_title="Y Position (m)",
+    template="plotly_white",
+    height=500
+)
+fig_ell.show()
 ```
 
 ---
