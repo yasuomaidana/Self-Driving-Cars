@@ -16,16 +16,92 @@ $$\left. \frac{\partial \bm{f}_{k-1}}{\partial\bm{x}_{k-1}} \right|_{\hat{\bm{x}
 \left. \frac{\partial \bm{f}_{k-1}}{\partial\bm{w}_{k-1}} \right|_{\hat{\bm{x}}_{k-1},\bm{u}_{k-1},0} =\bm{L}_{k-1} $$
 
 Linearized measurement model
-$$\bm{y}_k=\bm{h}_{k}\left(\bm{x}_{k},\bm{v}_{k}\right)\approx \bm{h}_{k} \left(\check{\bm{x}}_{k},0\right)+\left. \frac{\partial \bm{h}_{k}}{\partial\bm{x}_{k-1}} \right|_{\check{\bm{x}}_{k},0} \left(\bm{x}_{k}-\check{\bm{x}}_{k} \right)+
-\left. \frac{\partial \bm{h}_{k}}{\partial\bm{v}_{k}} \right|_{\hat{\bm{x}}_{k},0} \bm{v}_{k}
+$$\bm{y}_k=\bm{h}_{k}\left(\bm{x}_{k},\bm{v}_{k}\right)\approx \bm{h}_{k} \left(\check{\bm{x}}_{k},0\right)+\left. \frac{\partial \bm{h}_{k}}{\partial\bm{x}_{k}} \right|_{\check{\bm{x}}_{k},0} \left(\bm{x}_{k}-\check{\bm{x}}_{k} \right)+
+\left. \frac{\partial \bm{h}_{k}}{\partial\bm{v}_{k}} \right|_{\check{\bm{x}}_{k},0} \bm{v}_{k}
 $$
-$$\left. \frac{\partial \bm{h}_{k}}{\partial\bm{x}_{k-1}} \right|_{\check{\bm{x}}_{k},0} =\bm{H}_{k} \quad\quad
-\left. \frac{\partial \bm{h}_{k}}{\partial\bm{v}_{k}} \right|_{\hat{\bm{x}}_{k},0} =\bm{M}_{k} $$
+$$\left. \frac{\partial \bm{h}_{k}}{\partial\bm{x}_{k}} \right|_{\check{\bm{x}}_{k},0} =\bm{H}_{k} \quad\quad
+\left. \frac{\partial \bm{h}_{k}}{\partial\bm{v}_{k}} \right|_{\check{\bm{x}}_{k},0} =\bm{M}_{k} $$
 
 We now have a linear system in state-space! The matrices $\bm{F}_{k-1}$, $\bm{L}_{k-1}$, $\bm{H}_{k}$, and $\bm{M}_{k}$ are
 called the Jacobian matrices of the system.
 
-Intuitively, the Jacobian matrix tells you how fast each output of the function is changing along each input dimension
+Intuitively, the Jacobian matrix tells you how fast each output of the function is changing along each input dimension.
+
+---
+
+### Understanding the Noise Jacobians ($\bm{L}$ and $\bm{M}$)
+
+In standard linear Kalman filtering, noise is assumed to be **purely additive** ($\bm{w}$ added directly to state derivatives, $\bm{v}$ added directly to measurements). In real-world robotic and self-driving systems, noise often enters **nonlinearly** through control inputs (actuators) or coordinate transformations.
+
+* **$\bm{L}_{k-1}$ (Process Noise Jacobian):** Maps process / input noise $\bm{w}_{k-1}$ into the state space. It appears in the covariance prediction step:
+  $$\check{\bm{P}}_k = \bm{F}_{k-1} \hat{\bm{P}}_{k-1} \bm{F}_{k-1}^T + \bm{L}_{k-1} \bm{Q}_{k-1} \bm{L}_{k-1}^T$$
+* **$\bm{M}_k$ (Measurement Noise Jacobian):** Maps raw measurement noise $\bm{v}_k$ into the measurement space. It appears in the innovation covariance / Kalman gain:
+  $$\bm{S}_k = \bm{H}_k \check{\bm{P}}_k \bm{H}_k^T + \bm{M}_k \bm{R}_k \bm{M}_k^T$$
+
+---
+
+### Example 1: Derivation of $\bm{L}_{k-1}$ (Process Noise Jacobian)
+
+#### Case A: Additive Process Noise
+If noise enters additively as $\bm{x}_k = \bm{f}_{k-1}(\bm{x}_{k-1}, \bm{u}_{k-1}) + \bm{w}_{k-1}$, where $\bm{w}_{k-1} \in \mathbb{R}^n$:
+$$\bm{L}_{k-1} = \left. \frac{\partial \bm{f}_{k-1}}{\partial \bm{w}_{k-1}} \right|_{\hat{\bm{x}}_{k-1}, \bm{u}_{k-1}, \bm{0}} = \bm{I}_{n \times n}$$
+
+#### Case B: Non-Additive Actuator/Control Noise (2D Vehicle Kinematics)
+Consider a vehicle state with 2D position and heading:
+$$\bm{x}_{k-1} = \begin{bmatrix} p_x \\ p_y \\ \theta \end{bmatrix}_{k-1}$$
+
+The control inputs are linear velocity $v_{k-1}$ and yaw rate $\omega_{k-1}$, corrupted by input noise $\bm{w}_{k-1} = \begin{bmatrix} w_v \\ w_\omega \end{bmatrix}_{k-1} \sim \mathcal{N}(\bm{0}, \bm{Q}_{k-1})$. Over a sampling time $\Delta t$, the nonlinear motion equations are:
+
+$$\bm{f}_{k-1}(\bm{x}_{k-1}, \bm{u}_{k-1}, \bm{w}_{k-1}) = \begin{bmatrix} f_1 \\ f_2 \\ f_3 \end{bmatrix} = \begin{bmatrix} p_{x, k-1} + (v_{k-1} + w_{v, k-1}) \cos(\theta_{k-1}) \Delta t \\ p_{y, k-1} + (v_{k-1} + w_{v, k-1}) \sin(\theta_{k-1}) \Delta t \\ \theta_{k-1} + (\omega_{k-1} + w_{\omega, k-1}) \Delta t \end{bmatrix}$$
+
+To compute $\bm{L}_{k-1}$, take the partial derivatives with respect to each component of noise $\bm{w} = \begin{bmatrix} w_v & w_\omega \end{bmatrix}^T$:
+
+$$\bm{L}_{k-1} = \left. \frac{\partial \bm{f}_{k-1}}{\partial \bm{w}_{k-1}} \right|_{\hat{\bm{x}}_{k-1}, \bm{u}_{k-1}, \bm{w}=\bm{0}} = \begin{bmatrix} \frac{\partial f_1}{\partial w_v} & \frac{\partial f_1}{\partial w_\omega} \\ \frac{\partial f_2}{\partial w_v} & \frac{\partial f_2}{\partial w_\omega} \\ \frac{\partial f_3}{\partial w_v} & \frac{\partial f_3}{\partial w_\omega} \end{bmatrix}_{\hat{\bm{x}}_{k-1}, \bm{0}}$$
+
+Evaluating each term:
+1. $\frac{\partial f_1}{\partial w_v} = \cos(\hat{\theta}_{k-1}) \Delta t$, $\quad \frac{\partial f_1}{\partial w_\omega} = 0$
+2. $\frac{\partial f_2}{\partial w_v} = \sin(\hat{\theta}_{k-1}) \Delta t$, $\quad \frac{\partial f_2}{\partial w_\omega} = 0$
+3. $\frac{\partial f_3}{\partial w_v} = 0$, $\quad \frac{\partial f_3}{\partial w_\omega} = \Delta t$
+
+Thus:
+$$\bm{L}_{k-1} = \begin{bmatrix} \cos(\hat{\theta}_{k-1}) \Delta t & 0 \\ \sin(\hat{\theta}_{k-1}) \Delta t & 0 \\ 0 & \Delta t \end{bmatrix} \in \mathbb{R}^{3 \times 2}$$
+
+> **Key takeaway:** $\bm{L}_{k-1}$ maps the $2\text{D}$ actuator noise into the $3\text{D}$ state space, projecting velocity noise along the vehicle's heading direction $\hat{\theta}_{k-1}$.
+
+---
+
+### Example 2: Derivation of $\bm{M}_k$ (Measurement Noise Jacobian)
+
+#### Case A: Additive Measurement Noise
+If the measurement model is $\bm{y}_k = \bm{h}_k(\bm{x}_k) + \bm{v}_k$, where $\bm{v}_k \in \mathbb{R}^m$:
+$$\bm{M}_k = \left. \frac{\partial \bm{h}_k}{\partial \bm{v}_k} \right|_{\check{\bm{x}}_k, \bm{0}} = \bm{I}_{m \times m}$$
+
+#### Case B: Non-Additive Sensor Noise (Polar Sensor Converted to Cartesian Measurement)
+Suppose a LiDAR or Radar measures range $r$ and bearing $\phi$ with sensor noise $\bm{v}_k = \begin{bmatrix} v_r \\ v_\phi \end{bmatrix} \sim \mathcal{N}(\bm{0}, \bm{R}_k)$, but the measurement pre-processor converts them into Cartesian coordinates $\bm{y}_k = \begin{bmatrix} y_x \\ y_y \end{bmatrix}$:
+
+$$\bm{y}_k = \bm{h}_k(\bm{x}_k, \bm{v}_k) = \begin{bmatrix} h_1 \\ h_2 \end{bmatrix} = \begin{bmatrix} (r_k(\bm{x}_k) + v_r) \cos(\phi_k(\bm{x}_k) + v_\phi) \\ (r_k(\bm{x}_k) + v_r) \sin(\phi_k(\bm{x}_k) + v_\phi) \end{bmatrix}$$
+
+To compute $\bm{M}_k$, take the partial derivatives with respect to $\bm{v}_k = \begin{bmatrix} v_r & v_\phi \end{bmatrix}^T$ at $\bm{v} = \bm{0}$:
+
+$$\bm{M}_k = \left. \frac{\partial \bm{h}_k}{\partial \bm{v}_k} \right|_{\check{\bm{x}}_k, \bm{v}=\bm{0}} = \begin{bmatrix} \frac{\partial h_1}{\partial v_r} & \frac{\partial h_1}{\partial v_\phi} \\ \frac{\partial h_2}{\partial v_r} & \frac{\partial h_2}{\partial v_\phi} \end{bmatrix}_{\check{\bm{x}}_k, \bm{0}}$$
+
+Evaluating each term using the chain rule and evaluating at $\bm{v} = \bm{0}$:
+1. $\left. \frac{\partial h_1}{\partial v_r} \right|_{\bm{v}=\bm{0}} = \cos(\check{\phi}_k)$
+2. $\left. \frac{\partial h_1}{\partial v_\phi} \right|_{\bm{v}=\bm{0}} = -(\check{r}_k + 0) \sin(\check{\phi}_k + 0) = -\check{r}_k \sin(\check{\phi}_k)$
+3. $\left. \frac{\partial h_2}{\partial v_r} \right|_{\bm{v}=\bm{0}} = \sin(\check{\phi}_k)$
+4. $\left. \frac{\partial h_2}{\partial v_\phi} \right|_{\bm{v}=\bm{0}} = (\check{r}_k + 0) \cos(\check{\phi}_k + 0) = \check{r}_k \cos(\check{\phi}_k)$
+
+Thus:
+$$\bm{M}_k = \begin{bmatrix} \cos(\check{\phi}_k) & -\check{r}_k \sin(\check{\phi}_k) \\ \sin(\check{\phi}_k) & \check{r}_k \cos(\check{\phi}_k) \end{bmatrix}$$
+
+> **Key takeaway:** The angular noise $v_\phi$ produces Cartesian uncertainty that grows proportionally with the range distance $\check{r}_k$.
+
+#### Case C: Scale-Factor & Calibration Multiplicative Noise
+Suppose a sensor measuring position $p_k$ has an unknown scaling/calibration error $v_s$ and offset $v_b$ such that $\bm{v}_k = \begin{bmatrix} v_s \\ v_b \end{bmatrix}$:
+$$y_k = h_k(p_k, \bm{v}_k) = p_k (1 + v_s) + v_b$$
+
+The Jacobian $\bm{M}_k$ with respect to noise parameters $\bm{v}_k = \begin{bmatrix} v_s & v_b \end{bmatrix}^T$ is:
+$$\bm{M}_k = \left. \begin{bmatrix} \frac{\partial y_k}{\partial v_s} & \frac{\partial y_k}{\partial v_b} \end{bmatrix} \right|_{\check{p}_k, \bm{0}} = \begin{bmatrix} \check{p}_k & 1 \end{bmatrix}$$
 
 ## Putting it all together
 
@@ -217,27 +293,95 @@ $$\bm{P}_{xy}=\sum_{i=0}^{2N}\alpha^{(i)}(\bm{\check{x}}_k^{(i)}-\bm{\check{x}}_
 $$\bm{K}_k=\bm{P}_{xy}\bm{P}_{y}^{-1}$$
 
 4. Compute corrected mean and covariance
-$$\bm{\hat{x}}_k=\check{\bm{x}}_k=\bm{K}_k(\bm{y}_k-\bm{\hat{y}}_k)$$
-$$\bm{\hat{P}}_k=\check{\bm{P}}_k-\bm{K}_k\bm{P}_y\bm{K}_k^T$$
+$$\bm{\hat{x}}_k = \check{\bm{x}}_k + \bm{K}_k(\bm{y}_k - \bm{\hat{y}}_k)$$
+$$\bm{\hat{P}}_k = \check{\bm{P}}_k - \bm{K}_k \bm{P}_y \bm{K}_k^T$$
 
->$\bm{R}_{k}$ Additive measurement noise
+> $\bm{R}_{k}$: Additive measurement noise covariance matrix, $\bm{P}_y = \bm{S}_k$: Innovation covariance matrix.
 
-### UKF | Short example
-![example p1](./example%20p1.jpg)
-![ukf example p2](./UTF%20Example%201.jpg)
-![ukf example p3](./UTF%20Example%202.jpg)
-![ukf example p4](./UTF%20Example%203.jpg)
-![ukf example p5](./UTF%20Example%204.jpg)
-![ukf example p6](./UTF%20Example%205.jpg)
+---
+
+### Detailed Step-by-Step UKF Example: 2D Radar Landmark Tracking
+
+To understand every computation in practice, let's walk through a concrete numerical example of the UKF measurement update step for a 2D position state observed by a polar radar sensor.
+
+#### 1. Problem Formulation
+* **State vector ($L = 2$):** $\bm{x} = \begin{bmatrix} x \\ y \end{bmatrix}$ (Position in Cartesian coordinates).
+* **Prior state estimate & covariance:**
+  $$\check{\bm{x}}_k = \begin{bmatrix} 10.0 \\ 0.0 \end{bmatrix} \text{ m}, \quad \check{\bm{P}}_k = \begin{bmatrix} 1.0 & 0.0 \\ 0.0 & 4.0 \end{bmatrix}$$
+* **Nonlinear measurement model $\bm{h}(\bm{x})$ (Range & Bearing from sensor at origin):**
+  $$\bm{y} = \bm{h}(\bm{x}) + \bm{v} = \begin{bmatrix} \sqrt{x^2 + y^2} \\ \operatorname{atan2}(y, x) \end{bmatrix} + \bm{v}$$
+* **Measurement noise covariance $\bm{R}$:**
+  $$\bm{R} = \begin{bmatrix} 0.01\text{ m}^2 & 0 \\ 0 & 0.001\text{ rad}^2 \end{bmatrix}$$
+* **Actual sensor measurement received:**
+  $$\bm{y}_k = \begin{bmatrix} 10.2\text{ m} \\ 0.05\text{ rad} \end{bmatrix}$$
+
+---
+
+#### 2. UT Parameters and Weights
+For state dimension $L = 2$, choose standard parameter $\kappa = 3 - L = 1$, $\gamma = \sqrt{L + \kappa} = \sqrt{3} \approx 1.73205$.
+Number of sigma points: $2L + 1 = 5$.
+
+Weights:
+* Center weight: $\alpha^{(0)} = \frac{\kappa}{L + \kappa} = \frac{1}{3} \approx 0.3333$
+* Outer weights ($i = 1, \dots, 4$): $\alpha^{(i)} = \frac{1}{2(L + \kappa)} = \frac{1}{6} \approx 0.1667$
+
+---
+
+#### 3. Generating the Sigma Points
+1. **Cholesky decomposition:** $\bm{L}\bm{L}^T = \check{\bm{P}}_k \implies \bm{L} = \begin{bmatrix} 1.0 & 0.0 \\ 0.0 & 2.0 \end{bmatrix}$
+2. **Sigma points $\boldsymbol{\mathcal{X}}^{(i)}$:**
+   * $\boldsymbol{\mathcal{X}}^{(0)} = \check{\bm{x}}_k = \begin{bmatrix} 10.0 \\ 0.0 \end{bmatrix}$
+   * $\boldsymbol{\mathcal{X}}^{(1)} = \check{\bm{x}}_k + \sqrt{3} \begin{bmatrix} 1.0 \\ 0.0 \end{bmatrix} = \begin{bmatrix} 11.732 \\ 0.0 \end{bmatrix}$
+   * $\boldsymbol{\mathcal{X}}^{(2)} = \check{\bm{x}}_k + \sqrt{3} \begin{bmatrix} 0.0 \\ 2.0 \end{bmatrix} = \begin{bmatrix} 10.0 \\ 3.464 \end{bmatrix}$
+   * $\boldsymbol{\mathcal{X}}^{(3)} = \check{\bm{x}}_k - \sqrt{3} \begin{bmatrix} 1.0 \\ 0.0 \end{bmatrix} = \begin{bmatrix} 8.268 \\ 0.0 \end{bmatrix}$
+   * $\boldsymbol{\mathcal{X}}^{(4)} = \check{\bm{x}}_k - \sqrt{3} \begin{bmatrix} 0.0 \\ 2.0 \end{bmatrix} = \begin{bmatrix} 10.0 \\ -3.464 \end{bmatrix}$
+
+---
+
+#### 4. Propagating Sigma Points Through Sensor Model $\bm{h}(\cdot)$
+Pass each sigma point through $\bm{y}^{(i)} = \begin{bmatrix} \sqrt{x_i^2 + y_i^2} \\ \operatorname{atan2}(y_i, x_i) \end{bmatrix}$:
+
+1. $\boldsymbol{\mathcal{Y}}^{(0)} = \bm{h}\left(\begin{bmatrix} 10.0 \\ 0.0 \end{bmatrix}\right) = \begin{bmatrix} 10.000 \\ 0.0000 \end{bmatrix}$
+2. $\boldsymbol{\mathcal{Y}}^{(1)} = \bm{h}\left(\begin{bmatrix} 11.732 \\ 0.0 \end{bmatrix}\right) = \begin{bmatrix} 11.732 \\ 0.0000 \end{bmatrix}$
+3. $\boldsymbol{\mathcal{Y}}^{(2)} = \bm{h}\left(\begin{bmatrix} 10.0 \\ 3.464 \end{bmatrix}\right) = \begin{bmatrix} \sqrt{10^2 + 3.464^2} \\ \operatorname{atan2}(3.464, 10) \end{bmatrix} = \begin{bmatrix} 10.583 \\ 0.3335 \end{bmatrix}$
+4. $\boldsymbol{\mathcal{Y}}^{(3)} = \bm{h}\left(\begin{bmatrix} 8.268 \\ 0.0 \end{bmatrix}\right) = \begin{bmatrix} 8.268 \\ 0.0000 \end{bmatrix}$
+5. $\boldsymbol{\mathcal{Y}}^{(4)} = \bm{h}\left(\begin{bmatrix} 10.0 \\ -3.464 \end{bmatrix}\right) = \begin{bmatrix} 10.583 \\ -0.3335 \end{bmatrix}$
+
+---
+
+#### 5. Computing Predicted Measurement Mean and Innovation Covariance
+* **Predicted measurement mean $\hat{\bm{y}}_k$:**
+  $$\hat{\bm{y}}_k = \sum_{i=0}^4 \alpha^{(i)} \boldsymbol{\mathcal{Y}}^{(i)} = \frac{1}{3}\begin{bmatrix} 10.0 \\ 0 \end{bmatrix} + \frac{1}{6}\begin{bmatrix} 11.732 + 10.583 + 8.268 + 10.583 \\ 0 + 0.3335 + 0 - 0.3335 \end{bmatrix} = \begin{bmatrix} 10.194 \\ 0.0000 \end{bmatrix}$$
+  *(Notice how the non-zero cross-axis variance naturally increases predicted range mean to $10.194\text{ m}$, capturing non-linear curvature without truncation!)*
+
+* **Innovation Covariance $\bm{P}_y$ (or $\bm{S}_k$):**
+  $$\bm{P}_y = \sum_{i=0}^4 \alpha^{(i)} (\boldsymbol{\mathcal{Y}}^{(i)} - \hat{\bm{y}}_k)(\boldsymbol{\mathcal{Y}}^{(i)} - \hat{\bm{y}}_k)^T + \bm{R}$$
+  $$\bm{P}_y = \begin{bmatrix} 1.037 & 0.0 \\ 0.0 & 0.0381 \end{bmatrix}$$
+
+* **Cross-Covariance $\bm{P}_{xy}$:**
+  $$\bm{P}_{xy} = \sum_{i=0}^4 \alpha^{(i)} (\boldsymbol{\mathcal{X}}^{(i)} - \check{\bm{x}}_k)(\boldsymbol{\mathcal{Y}}^{(i)} - \hat{\bm{y}}_k)^T = \begin{bmatrix} 1.000 & 0.0 \\ 0.0 & 0.385 \end{bmatrix}$$
+
+---
+
+#### 6. Kalman Gain and State Update
+* **Kalman Gain $\bm{K}_k$:**
+  $$\bm{K}_k = \bm{P}_{xy} \bm{P}_y^{-1} = \begin{bmatrix} \frac{1.000}{1.037} & 0 \\ 0 & \frac{0.385}{0.0381} \end{bmatrix} \approx \begin{bmatrix} 0.964 & 0.0 \\ 0.0 & 10.10 \end{bmatrix}$$
+
+* **State Correction $\hat{\bm{x}}_k$:**
+  $$\bm{y}_k - \hat{\bm{y}}_k = \begin{bmatrix} 10.20 \\ 0.05 \end{bmatrix} - \begin{bmatrix} 10.194 \\ 0.00 \end{bmatrix} = \begin{bmatrix} 0.006 \\ 0.050 \end{bmatrix}$$
+  $$\hat{\bm{x}}_k = \check{\bm{x}}_k + \bm{K}_k(\bm{y}_k - \hat{\bm{y}}_k) = \begin{bmatrix} 10.0 \\ 0.0 \end{bmatrix} + \begin{bmatrix} 0.964(0.006) \\ 10.10(0.050) \end{bmatrix} = \begin{bmatrix} 10.006 \\ 0.505 \end{bmatrix}\text{ m}$$
+
+* **Updated Covariance $\hat{\bm{P}}_k$:**
+  $$\hat{\bm{P}}_k = \check{\bm{P}}_k - \bm{K}_k \bm{P}_y \bm{K}_k^T = \begin{bmatrix} 0.036 & 0.0 \\ 0.0 & 0.111 \end{bmatrix}$$
 
 ## Summary
 
-||EKF|ES-EKF|UKF|
-|--|---|---|---|
-|**Operating Principle**|<center>Linearization </br> (Full State)</center>|<center>Linearization </br>(Error State)</center>|Unscented Transform|
-|**Accuracy**|Good|Better|Best|
-|**Jacobians**|Required|Required|Not required|
-|**Speed**|Slightly faster|Slightly faster|Slightly slower
+| EKF                     | ES-EKF                                            | UKF                                               |                     |
+| ----------------------- | ------------------------------------------------- | ------------------------------------------------- | ------------------- |
+| **Operating Principle** | <center>Linearization </br> (Full State)</center> | <center>Linearization </br>(Error State)</center> | Unscented Transform |
+| **Accuracy**            | Good                                              | Better                                            | Best                |
+| **Jacobians**           | Required                                          | Required                                          | Not required        |
+| **Speed**               | Slightly faster                                   | Slightly faster                                   | Slightly slower     |
 
 ## Additional Resources
 
