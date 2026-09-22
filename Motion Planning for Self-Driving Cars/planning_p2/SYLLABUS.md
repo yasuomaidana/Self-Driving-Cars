@@ -40,6 +40,7 @@ By the end of the course, students will be able to:
 #### Session 02: Environmental Representation & Occupancy Grid Mapping
 - **Theory (2 Hours):**
   - Road representations: High-Definition (HD) Vector maps, Lanelets, Road Graph representations.
+  - Road-Aligned Coordinate Systems: Curvilinear Frenet-Serret frame $(s, d)$, Cartesian $\leftrightarrow$ Frenet transformations, and longitudinal/lateral planning decoupling.
   - 2D Occupancy Grid Maps: Binary state space, probabilistic cell representation, and Log-Odds formulation.
   - LiDAR and Sonar Inverse Measurement Models: Beam range-bearing sensor models, free space ray-casting, and occupied cell probability updates.
   - Efficient grid update pipelines and handling sensor noise/uncertainty.

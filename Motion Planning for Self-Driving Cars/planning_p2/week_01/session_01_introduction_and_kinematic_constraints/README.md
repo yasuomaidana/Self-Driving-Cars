@@ -25,10 +25,26 @@ By the end of this session, students will be able to:
 - [03. Objective Functions for Autonomous Driving](theory/03_objective_functions.md): Mathematical definition of safety, comfort (jerk, lateral acceleration), progress, and rule compliance costs.
 
 ### 2. Practice Lab (1 Hour)
-- Lab Exercise: [`practice/exercise_kinematic_bicycle.py`](practice/exercise_kinematic_bicycle.py)
-- Reference Solution: [`practice/solution_kinematic_bicycle.py`](practice/solution_kinematic_bicycle.py)
-- Run the lab:
-  ```bash
-  source ../../.venv/bin/activate
-  python practice/exercise_kinematic_bicycle.py
-  ```
+- **Lab 1: Kinematic Bicycle Model & Physical Constraints**
+  - Student Exercise: [`practice/exercise_kinematic_bicycle.py`](practice/exercise_kinematic_bicycle.py) | [`practice/exercise_kinematic_bicycle.ipynb`](practice/exercise_kinematic_bicycle.ipynb)
+  - Reference Solution: [`practice/solution_kinematic_bicycle.py`](practice/solution_kinematic_bicycle.py) | [`practice/solution_kinematic_bicycle.ipynb`](practice/solution_kinematic_bicycle.ipynb)
+  - Run the lab:
+    ```bash
+    uv run python practice/exercise_kinematic_bicycle.py
+    ```
+
+- **Lab 2: Classical vs. Modern Velocity Profile Optimization**
+  - Student Exercise: [`practice/exercise_velocity_profile_optimization.ipynb`](practice/exercise_velocity_profile_optimization.ipynb) | [`practice/exercise_velocity_profile_optimization.py`](practice/exercise_velocity_profile_optimization.py)
+  - Reference Solution: [`practice/solution_velocity_profile_optimization.ipynb`](practice/solution_velocity_profile_optimization.ipynb) | [`practice/solution_velocity_profile_optimization.py`](practice/solution_velocity_profile_optimization.py)
+  - Run the lab:
+    ```bash
+    uv run python practice/solution_velocity_profile_optimization.py
+    ```
+
+- **Lab 3: 2D Frenet Frame Trajectory Optimization (Convex QP & Corridor Bounds)**
+  - Student Exercise: [`practice/exercise_frenet_trajectory_optimization.ipynb`](practice/exercise_frenet_trajectory_optimization.ipynb) | [`practice/exercise_frenet_trajectory_optimization.py`](practice/exercise_frenet_trajectory_optimization.py)
+  - Reference Solution: [`practice/solution_frenet_trajectory_optimization.ipynb`](practice/solution_frenet_trajectory_optimization.ipynb) | [`practice/solution_frenet_trajectory_optimization.py`](practice/solution_frenet_trajectory_optimization.py)
+  - Run the lab:
+    ```bash
+    uv run python practice/solution_frenet_trajectory_optimization.py
+    ```

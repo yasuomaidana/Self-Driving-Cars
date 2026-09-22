@@ -12,6 +12,7 @@ import numpy as np
 import polars as pl
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import scipy.integrate as integrate
 from scipy.optimize import minimize
 
 
@@ -28,6 +29,19 @@ def road_curvature(s: np.ndarray) -> np.ndarray:
     s_curve = 100.0   # curve center (meters)
     sigma = 15.0      # curve width (meters)
     return kappa_max * np.exp(-((s - s_curve) ** 2) / (2.0 * (sigma ** 2)))
+
+
+def compute_2d_spatial_path(s: np.ndarray, kappa: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Reconstructs 2D Cartesian path (x, y, theta) by integrating road curvature along arc-length s:
+      theta(s) = integral(kappa(s) ds)
+      x(s) = integral(cos(theta(s)) ds)
+      y(s) = integral(sin(theta(s)) ds)
+    """
+    theta = integrate.cumulative_trapezoid(kappa, s, initial=0.0)
+    x = integrate.cumulative_trapezoid(np.cos(theta), s, initial=0.0)
+    y = integrate.cumulative_trapezoid(np.sin(theta), s, initial=0.0)
+    return x, y, theta
 
 
 # ==========================================
@@ -78,6 +92,7 @@ def compute_classical_velocity_profile(
     accel = np.gradient(v_prof, time_arr)
     jerk = np.gradient(accel, time_arr)
     a_lat = (v_prof ** 2) * kappa
+    x, y, theta = compute_2d_spatial_path(s_points, kappa)
 
     return {
         "s": s_points,
@@ -87,7 +102,10 @@ def compute_classical_velocity_profile(
         "jerk": jerk,
         "a_lat": a_lat,
         "kappa": kappa,
-        "v_bound": v_bound
+        "v_bound": v_bound,
+        "x": x,
+        "y": y,
+        "theta": theta
     }
 
 
@@ -137,13 +155,11 @@ def solve_modern_trajectory_optimization(
         return w_track * cost_track + w_accel * cost_accel + w_jerk * cost_jerk
 
     # Hard constraints:
-    # 1. Lateral acceleration: a_lat_max - v^2 * kappa(s) >= 0
     def lat_accel_constraint(v):
         s = get_s(v)
         kappa = road_curvature(s)
         return a_lat_max - (v ** 2) * kappa
 
-    # 2. Speed limit: v_limit - v >= 0
     def speed_limit_constraint(v):
         return v_limit - v
 
@@ -170,6 +186,7 @@ def solve_modern_trajectory_optimization(
     accel_opt = np.gradient(v_opt, time)
     jerk_opt = np.gradient(accel_opt, time)
     a_lat_opt = (v_opt ** 2) * kappa_opt
+    x_opt, y_opt, theta_opt = compute_2d_spatial_path(s_opt, kappa_opt)
     
     return {
         "s": s_opt,
@@ -178,7 +195,10 @@ def solve_modern_trajectory_optimization(
         "accel": accel_opt,
         "jerk": jerk_opt,
         "a_lat": a_lat_opt,
-        "kappa": kappa_opt
+        "kappa": kappa_opt,
+        "x": x_opt,
+        "y": y_opt,
+        "theta": theta_opt
     }
 
 
@@ -190,6 +210,8 @@ def create_comparison_telemetry(classical_res: dict, modern_res: dict) -> pl.Dat
     df_classical = pl.DataFrame({
         "time": classical_res["time"],
         "s": classical_res["s"],
+        "x": classical_res["x"],
+        "y": classical_res["y"],
         "velocity": classical_res["v"],
         "accel": classical_res["accel"],
         "jerk": classical_res["jerk"],
@@ -200,6 +222,8 @@ def create_comparison_telemetry(classical_res: dict, modern_res: dict) -> pl.Dat
     df_modern = pl.DataFrame({
         "time": modern_res["time"],
         "s": modern_res["s"],
+        "x": modern_res["x"],
+        "y": modern_res["y"],
         "velocity": modern_res["v"],
         "accel": modern_res["accel"],
         "jerk": modern_res["jerk"],
@@ -212,51 +236,134 @@ def create_comparison_telemetry(classical_res: dict, modern_res: dict) -> pl.Dat
 
 def plot_optimization_comparison(classical_res: dict, modern_res: dict, v_limit: float = 13.0, a_lat_max: float = 2.5):
     fig = make_subplots(
-        rows=2, cols=2,
+        rows=3, cols=2,
         subplot_titles=(
+            "2D Spatial Trajectory Map (Bird's-Eye View)",
             "Velocity Profile v(s)",
             "Longitudinal Acceleration a(s)",
             "Longitudinal Jerk j(s) [Passenger Comfort]",
-            "Lateral Acceleration a_lat(s)"
+            "Lateral Acceleration a_lat(s)",
+            "Road Curvature Profile κ(s)"
         ),
-        vertical_spacing=0.15,
-        horizontal_spacing=0.12
+        vertical_spacing=0.09,
+        horizontal_spacing=0.10
     )
     
-    # 1. Velocity Profile
-    fig.add_trace(go.Scatter(x=classical_res["s"], y=classical_res["v_bound"], mode='lines', name='Geometric Bound v_bound(s)', line=dict(dash='dash', color='gray')), row=1, col=1)
-    fig.add_trace(go.Scatter(x=classical_res["s"], y=classical_res["v"], mode='lines', name='Classical Profile', line=dict(color='crimson', width=2)), row=1, col=1)
-    fig.add_trace(go.Scatter(x=modern_res["s"], y=modern_res["v"], mode='lines', name='Modern Smooth Opt', line=dict(color='royalblue', width=2.5)), row=1, col=1)
+    # 1. 2D Spatial Trajectory Map
+    fig.add_trace(go.Scatter(
+        x=classical_res["x"], y=classical_res["y"],
+        mode='lines', name='Classical Profile',
+        line=dict(color='crimson', width=3),
+        legendgroup='classical'
+    ), row=1, col=1)
     
-    # 2. Acceleration Profile
-    fig.add_trace(go.Scatter(x=classical_res["s"], y=classical_res["accel"], mode='lines', name='Classical Accel', line=dict(color='crimson', width=1.5), showlegend=False), row=1, col=2)
-    fig.add_trace(go.Scatter(x=modern_res["s"], y=modern_res["accel"], mode='lines', name='Modern Accel', line=dict(color='royalblue', width=2), showlegend=False), row=1, col=2)
+    fig.add_trace(go.Scatter(
+        x=modern_res["x"], y=modern_res["y"],
+        mode='lines', name='Modern Smooth Opt',
+        line=dict(color='royalblue', width=3.5, dash='dot'),
+        legendgroup='modern'
+    ), row=1, col=1)
     
-    # 3. Jerk Profile
-    fig.add_trace(go.Scatter(x=classical_res["s"], y=classical_res["jerk"], mode='lines', name='Classical Jerk', line=dict(color='crimson', width=1.5), showlegend=False), row=2, col=1)
-    fig.add_trace(go.Scatter(x=modern_res["s"], y=modern_res["jerk"], mode='lines', name='Modern Jerk', line=dict(color='royalblue', width=2), showlegend=False), row=2, col=1)
+    # 2. Velocity Profile v(s)
+    fig.add_trace(go.Scatter(
+        x=classical_res["s"], y=classical_res["v_bound"],
+        mode='lines', name='Geometric Bound v_bound(s)',
+        line=dict(dash='dash', color='gray', width=1.5),
+        legendgroup='bounds'
+    ), row=1, col=2)
+    fig.add_trace(go.Scatter(
+        x=classical_res["s"], y=classical_res["v"],
+        mode='lines', name='Classical Profile',
+        line=dict(color='crimson', width=2),
+        legendgroup='classical', showlegend=False
+    ), row=1, col=2)
+    fig.add_trace(go.Scatter(
+        x=modern_res["s"], y=modern_res["v"],
+        mode='lines', name='Modern Smooth Opt',
+        line=dict(color='royalblue', width=2.5),
+        legendgroup='modern', showlegend=False
+    ), row=1, col=2)
     
-    # 4. Lateral Acceleration Profile
-    fig.add_trace(go.Scatter(x=classical_res["s"], y=[a_lat_max]*len(classical_res["s"]), mode='lines', name='a_lat Max Comfort Limit', line=dict(dash='dash', color='orange')), row=2, col=2)
-    fig.add_trace(go.Scatter(x=classical_res["s"], y=classical_res["a_lat"], mode='lines', name='Classical a_lat', line=dict(color='crimson', width=1.5), showlegend=False), row=2, col=2)
-    fig.add_trace(go.Scatter(x=modern_res["s"], y=modern_res["a_lat"], mode='lines', name='Modern a_lat', line=dict(color='royalblue', width=2), showlegend=False), row=2, col=2)
+    # 3. Acceleration Profile a(s)
+    fig.add_trace(go.Scatter(
+        x=classical_res["s"], y=classical_res["accel"],
+        mode='lines', name='Classical Accel',
+        line=dict(color='crimson', width=1.8),
+        legendgroup='classical', showlegend=False
+    ), row=2, col=1)
+    fig.add_trace(go.Scatter(
+        x=modern_res["s"], y=modern_res["accel"],
+        mode='lines', name='Modern Accel',
+        line=dict(color='royalblue', width=2),
+        legendgroup='modern', showlegend=False
+    ), row=2, col=1)
     
-    # Layout adjustments
-    fig.update_xaxes(title_text="Arc-Length s (m)", row=1, col=1)
+    # 4. Jerk Profile j(s)
+    fig.add_trace(go.Scatter(
+        x=classical_res["s"], y=classical_res["jerk"],
+        mode='lines', name='Classical Jerk',
+        line=dict(color='crimson', width=1.8),
+        legendgroup='classical', showlegend=False
+    ), row=2, col=2)
+    fig.add_trace(go.Scatter(
+        x=modern_res["s"], y=modern_res["jerk"],
+        mode='lines', name='Modern Jerk',
+        line=dict(color='royalblue', width=2),
+        legendgroup='modern', showlegend=False
+    ), row=2, col=2)
+    
+    # 5. Lateral Acceleration a_lat(s)
+    fig.add_trace(go.Scatter(
+        x=classical_res["s"], y=[a_lat_max] * len(classical_res["s"]),
+        mode='lines', name='a_lat Max Comfort Limit',
+        line=dict(dash='dash', color='orange', width=1.5),
+        legendgroup='bounds', showlegend=False
+    ), row=3, col=1)
+    fig.add_trace(go.Scatter(
+        x=classical_res["s"], y=classical_res["a_lat"],
+        mode='lines', name='Classical a_lat',
+        line=dict(color='crimson', width=1.8),
+        legendgroup='classical', showlegend=False
+    ), row=3, col=1)
+    fig.add_trace(go.Scatter(
+        x=modern_res["s"], y=modern_res["a_lat"],
+        mode='lines', name='Modern a_lat',
+        line=dict(color='royalblue', width=2),
+        legendgroup='modern', showlegend=False
+    ), row=3, col=1)
+    
+    # 6. Road Curvature Profile kappa(s)
+    fig.add_trace(go.Scatter(
+        x=classical_res["s"], y=classical_res["kappa"],
+        mode='lines', name='Road Curvature κ(s)',
+        line=dict(color='darkgreen', width=2),
+        legendgroup='bounds', showlegend=False
+    ), row=3, col=2)
+
+    # Axis formatting
+    fig.update_xaxes(title_text="X Position (m)", row=1, col=1)
+    fig.update_yaxes(title_text="Y Position (m)", row=1, col=1)
+    
     fig.update_xaxes(title_text="Arc-Length s (m)", row=1, col=2)
-    fig.update_xaxes(title_text="Arc-Length s (m)", row=2, col=1)
-    fig.update_xaxes(title_text="Arc-Length s (m)", row=2, col=2)
+    fig.update_yaxes(title_text="Velocity (m/s)", row=1, col=2)
     
-    fig.update_yaxes(title_text="Velocity (m/s)", row=1, col=1)
-    fig.update_yaxes(title_text="Accel (m/s²)", row=1, col=2)
-    fig.update_yaxes(title_text="Jerk (m/s³)", row=2, col=1)
-    fig.update_yaxes(title_text="Lat Accel (m/s²)", row=2, col=2)
+    fig.update_xaxes(title_text="Arc-Length s (m)", row=2, col=1)
+    fig.update_yaxes(title_text="Accel (m/s²)", row=2, col=1)
+    
+    fig.update_xaxes(title_text="Arc-Length s (m)", row=2, col=2)
+    fig.update_yaxes(title_text="Jerk (m/s³)", row=2, col=2)
+    
+    fig.update_xaxes(title_text="Arc-Length s (m)", row=3, col=1)
+    fig.update_yaxes(title_text="Lat Accel (m/s²)", row=3, col=1)
+    
+    fig.update_xaxes(title_text="Arc-Length s (m)", row=3, col=2)
+    fig.update_yaxes(title_text="Curvature κ (1/m)", row=3, col=2)
     
     fig.update_layout(
         title_text="Comparison: Classical Decoupled vs. Modern Multi-Objective Trajectory Optimization",
         template="plotly_white",
-        height=750,
-        legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
+        height=950,
+        legend=dict(orientation="h", yanchor="bottom", y=1.03, xanchor="center", x=0.5)
     )
     return fig
 
@@ -269,10 +376,7 @@ if __name__ == "__main__":
     print("Solving modern multi-objective trajectory optimization...")
     modern_res = solve_modern_trajectory_optimization()
     
-    df_telemetry = create_comparison_telemetry(classical_res, modern_res)
-    print(f"\nTelemetry DataFrame generated successfully with shape: {df_telemetry.shape}")
-    print(df_telemetry.head(5))
-    
     fig = plot_optimization_comparison(classical_res, modern_res)
     print(f"\nFinal Distance Covered - Classical: {classical_res['s'][-1]:.1f}m | Modern: {modern_res['s'][-1]:.1f}m")
     print(f"Max Lateral Accel - Classical: {np.max(classical_res['a_lat']):.2f} m/s² | Modern: {np.max(modern_res['a_lat']):.2f} m/s² (Limit: 2.50 m/s²)")
+    print("[Done] Script executed cleanly. Plot figure ready.")
