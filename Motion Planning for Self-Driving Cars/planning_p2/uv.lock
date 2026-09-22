@@ -396,7 +396,7 @@ wheels = [
 [[package]]
 name = "planning-p2"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "ipykernel" },
     { name = "nbformat" },

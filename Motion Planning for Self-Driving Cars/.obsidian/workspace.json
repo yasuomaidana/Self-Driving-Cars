@@ -219,6 +219,7 @@
   },
   "active": "b1c523cd67d511cb",
   "lastOpenFiles": [
+    "UV_LAB_GUIDE.md",
     "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/practice/solution_velocity_profile_optimization.ipynb~",
     "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/kinematic_bicycle_exercise.html",
     "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/kinematic_bicycle_solution.html",
@@ -230,7 +231,6 @@
     "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/practice/solution_frenet_trajectory_optimization.ipynb~",
     "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/practice/exercise_frenet_trajectory_optimization.ipynb",
     "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/practice/solution_frenet_trajectory_optimization.ipynb",
-    "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/practice/exercise_frenet_trajectory_optimization.py",
     "The Planning Problem/Motion Planning Constraints.md",
     "The Planning Problem/Hierarchical Motion Planning.md",
     "The Planning Problem/Objective Functions for Autonomous Driving.md",
