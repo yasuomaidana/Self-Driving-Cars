@@ -23,6 +23,7 @@ By the end of this session, students will be able to:
 - [01. Motion Planning Hierarchy](theory/01_motion_planning_hierarchy.md): Mission Planner vs Behavior Planner vs Local Motion Planner.
 - [02. Vehicle Kinematics & Constraints](theory/02_vehicle_kinematics_and_constraints.md): Front-wheel steered kinematic bicycle model, Ackermann steering, turning radius, and friction ellipse limits.
 - [03. Objective Functions for Autonomous Driving](theory/03_objective_functions.md): Mathematical definition of safety, comfort (jerk, lateral acceleration), progress, and rule compliance costs.
+- [04. Instructor Guide: Velocity Profiling & Trajectory Optimization](theory/04_velocity_profiling_and_optimization_instructor_guide.md): Classical forward-backward profiling vs. modern NLP trajectory optimization with Mermaid architecture diagrams.
 
 ### 2. Practice Lab (1 Hour)
 - **Lab 1: Kinematic Bicycle Model & Physical Constraints**
