@@ -14,15 +14,23 @@ At each planning tick (e.g. every $\Delta t_{plan} = 100\text{ms}$):
 
 If the local optimizer fails to find a valid collision-free trajectory or if an unexpected obstacle cuts into the vehicle's safety envelope:
 
-```
-Level 1: Nominal Local Plan (Smooth Lattice / Optimized Spline)
-    │ (Failure: No feasible path)
-    ▼
-Level 2: In-Lane Comfort Deceleration (Follow lead car / decelerate to 0 at -2.0 m/s^2)
-    │ (Failure: Collision imminent TTC < 1.2s)
-    ▼
-Level 3: Emergency Automatic Braking (Max deceleration -6.0 to -8.0 m/s^2 to full stop)
-    │ (Failure: Actuator or localization failure)
-    ▼
-Level 4: Minimum Risk Maneuver (Pull over to shoulder and activate hazard flashers)
+```mermaid
+flowchart TD
+    L1["<b>Level 1: Nominal Local Plan</b><br/>Smooth Conformal Lattice / Optimized Spline Path"]
+    L2["<b>Level 2: In-Lane Comfort Deceleration</b><br/>Follow lead vehicle / Decelerate smoothly at -2.0 m/s²"]
+    L3["<b>Level 3: Emergency Automatic Braking (AEB)</b><br/>Max deceleration (-6.0 to -8.0 m/s²) to full stop"]
+    L4["<b>Level 4: Minimum Risk Maneuver (MRM)</b><br/>Pull over to drivable shoulder & activate hazard flashers"]
+    
+    L1 -->|Failure: Infeasible path or dynamic intrusion| L2
+    L2 -->|Failure: Critical collision risk TTC < 1.2s| L3
+    L3 -->|Failure: Actuator fault / critical sensor loss| L4
+    
+    classDef l1 fill:#e8f5e9,stroke:#388e3c,stroke-width:1.5px;
+    classDef l2 fill:#fff8e1,stroke:#fbc02d,stroke-width:1.5px;
+    classDef l3 fill:#ffebee,stroke:#d32f2f,stroke-width:1.5px;
+    classDef l4 fill:#424242,stroke:#212121,color:#fff,stroke-width:2px;
+    class L1 l1;
+    class L2 l2;
+    class L3 l3;
+    class L4 l4;
 ```

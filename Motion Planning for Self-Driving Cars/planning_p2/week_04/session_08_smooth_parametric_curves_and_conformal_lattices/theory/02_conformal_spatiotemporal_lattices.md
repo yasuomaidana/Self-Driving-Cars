@@ -4,10 +4,28 @@
 
 Rather than generating arbitrary random paths in global Cartesian space $(x, y)$, a **Conformal Lattice** samples trajectories aligned with the road geometry:
 
-```
-Reference Lane Centerline (d = 0) ──────────────────────────────────
-Left Lane Offset (d = +3.5m)      - - - - - - - - - - - - - - - - - - -
-Right Lane Offset (d = -3.5m)     - - - - - - - - - - - - - - - - - - -
+```mermaid
+flowchart LR
+    Start["Vehicle State<br/>(s₀, d₀)"]
+    
+    subgraph LatticeGoals["Conformal Sampling Horizons (s_f, d_f)"]
+        L_Left["Left Lane Offset<br/>d_f = +3.5m"]
+        L_NudgeLeft["Left Nudge<br/>d_f = +1.75m"]
+        L_Center["Lane Centerline<br/>d_f = 0.0m"]
+        L_NudgeRight["Right Nudge<br/>d_f = -1.75m"]
+        L_Right["Right Lane Offset<br/>d_f = -3.5m"]
+    end
+    
+    Start -->|Cubic Spiral / Polynomial| L_Left
+    Start -->|Cubic Spiral / Polynomial| L_NudgeLeft
+    Start -->|Cubic Spiral / Polynomial| L_Center
+    Start -->|Cubic Spiral / Polynomial| L_NudgeRight
+    Start -->|Cubic Spiral / Polynomial| L_Right
+    
+    classDef center fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef side fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px;
+    class L_Center center;
+    class L_Left,L_NudgeLeft,L_NudgeRight,L_Right side;
 ```
 
 A discrete grid of target boundary states $(s_f, d_f)$ is placed at fixed lookahead distances:

@@ -4,16 +4,11 @@
 
 Standard 4-wheeled passenger vehicles are steered by the front wheels using Ackermann steering geometry. At low to moderate speeds where tire slip is negligible (no significant lateral skidding), the 4-wheel vehicle can be simplified into a 2-wheel **Kinematic Bicycle Model**:
 
-```
-        Front Wheel (steered by δ)
-              [ | ]
-                ^
-                |
-                |  L (Wheelbase)
-                |
-                v
-              [ | ]
-        Rear Wheel (fixed along vehicle body)
+```mermaid
+flowchart TD
+    FW["<b>Front Wheel</b><br/>Steering Angle: δ<br/>Velocity vector aligned with wheel heading"]
+    RW["<b>Rear Wheel</b><br/>Fixed orientation along vehicle body axis<br/>Reference Point: (x, y, θ)"]
+    FW <-->|"Wheelbase Length: L"| RW
 ```
 
 ### Mathematical State Equations (Rear Axle Reference)

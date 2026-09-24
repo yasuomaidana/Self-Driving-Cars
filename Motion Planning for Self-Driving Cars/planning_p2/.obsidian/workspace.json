@@ -11,14 +11,10 @@
             "id": "146552b54b4cce9c",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "week_01/session_02_environmental_mapping_and_occupancy_grids/theory/01_hd_maps_and_lanelets.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "01_hd_maps_and_lanelets"
+              "title": "New tab"
             }
           }
         ]
@@ -190,12 +186,23 @@
   },
   "active": "146552b54b4cce9c",
   "lastOpenFiles": [
-    "week_01/session_01_introduction_and_kinematic_constraints/theory/04_velocity_profiling_and_optimization_instructor_guide.md",
-    "week_01/session_02_environmental_mapping_and_occupancy_grids/theory/04_frenet_coordinate_frames.md",
+    "week_01/session_02_environmental_mapping_and_occupancy_grids/practice/map_evolution.mp4",
+    "occupancy_and_costmap_solution.html",
+    "week_01/session_02_environmental_mapping_and_occupancy_grids/practice/map_evolution.gif",
+    "week_01/session_02_environmental_mapping_and_occupancy_grids/practice/map_evolution_interactive.html",
+    "week_01/session_02_environmental_mapping_and_occupancy_grids/practice/generate_map_evolution_video.py",
+    "week_01/session_02_environmental_mapping_and_occupancy_grids/practice/occupancy_and_costmap_solution.html",
     "week_01/session_02_environmental_mapping_and_occupancy_grids/theory/03_lidar_inverse_sensor_model.md",
+    "week_01/session_02_environmental_mapping_and_occupancy_grids/theory/06_frenet_coordinate_frames.md",
+    "week_01/session_02_environmental_mapping_and_occupancy_grids/theory/04_lidar_inverse_sensor_model.md",
+    "week_01/session_02_environmental_mapping_and_occupancy_grids/theory/03_occupancy_grids_and_log_odds.md",
+    "week_01/session_02_environmental_mapping_and_occupancy_grids/theory/05_costmaps_and_obstacle_inflation.md",
+    "week_01/session_02_environmental_mapping_and_occupancy_grids/theory/02_lidar_preprocessing_and_filtering.md",
     "week_01/session_02_environmental_mapping_and_occupancy_grids/theory/02_occupancy_grids_and_log_odds.md",
     "week_01/session_02_environmental_mapping_and_occupancy_grids/theory/01_hd_maps_and_lanelets.md",
     "week_01/session_01_introduction_and_kinematic_constraints/theory/03_objective_functions.md",
+    "week_01/session_01_introduction_and_kinematic_constraints/theory/04_velocity_profiling_and_optimization_instructor_guide.md",
+    "week_01/session_02_environmental_mapping_and_occupancy_grids/theory/04_frenet_coordinate_frames.md",
     "week_01/session_01_introduction_and_kinematic_constraints/kinematic_bicycle_exercise.html",
     "week_01/session_01_introduction_and_kinematic_constraints/kinematic_bicycle_solution.html",
     "week_01/session_01_introduction_and_kinematic_constraints/practice/solution_kinematic_bicycle.ipynb",
@@ -203,10 +210,6 @@
     "week_01/session_01_introduction_and_kinematic_constraints/practice/build_frenet_notebooks.py",
     "week_04/session_08_smooth_parametric_curves_and_conformal_lattices/theory/01_parametric_curves_cubic_spirals.md",
     "week_01/session_01_introduction_and_kinematic_constraints/practice/__pycache__/solution_frenet_trajectory_optimization.cpython-314.pyc",
-    "week_01/session_01_introduction_and_kinematic_constraints/practice/solution_frenet_trajectory_optimization.ipynb~",
-    "week_01/session_01_introduction_and_kinematic_constraints/practice/exercise_frenet_trajectory_optimization.ipynb",
-    "week_01/session_01_introduction_and_kinematic_constraints/practice/solution_frenet_trajectory_optimization.ipynb",
-    "week_01/session_01_introduction_and_kinematic_constraints/practice/exercise_frenet_trajectory_optimization.py",
     "week_01/session_01_introduction_and_kinematic_constraints/theory/02_vehicle_kinematics_and_constraints.md",
     "week_01/session_01_introduction_and_kinematic_constraints/theory/01_motion_planning_hierarchy.md",
     "week_01/session_01_introduction_and_kinematic_constraints/README.md",

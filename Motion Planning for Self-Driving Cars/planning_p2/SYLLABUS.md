@@ -37,17 +37,19 @@ By the end of the course, students will be able to:
   - Verification of acceleration, steering angle, and curvature constraints.
   - Interactive trajectory rollout visualization and state-space plotting using **Plotly** and tabular state logging using **Polars**.
 
-#### Session 02: Environmental Representation & Occupancy Grid Mapping
+#### Session 02: Environmental Representation, Occupancy Grids & Costmaps
 - **Theory (2 Hours):**
-  - Road representations: High-Definition (HD) Vector maps, Lanelets, Road Graph representations.
+  - Road representations & HD Maps: High-Definition (HD) Vector maps, Lanelet2 architecture (physical, regulatory, topological layers), OpenDRIVE, and Road Network Graphs.
+  - LiDAR Point Cloud Preprocessing: Voxel downsampling, RANSAC / ray ground plane removal, ceiling filtering, and dynamic vehicle filtering vs. parked car persistence.
+  - 2D Occupancy Grid Maps: Binary Bayesian state estimation, complete mathematical derivation of the Log-Odds formulation, and numerical stability clamping.
+  - Sensor Inverse Models: Beam range-bearing sensor geometry, free-space ray-casting, and obstacle surface dilation.
+  - Costmaps & Safety Inflation: Multi-layered costmaps, Euclidean Distance Transforms (EDT), lethal obstacle thresholds, inscribed vehicle radii, and exponential safety decay buffers.
   - Road-Aligned Coordinate Systems: Curvilinear Frenet-Serret frame $(s, d)$, Cartesian $\leftrightarrow$ Frenet transformations, and longitudinal/lateral planning decoupling.
-  - 2D Occupancy Grid Maps: Binary state space, probabilistic cell representation, and Log-Odds formulation.
-  - LiDAR and Sonar Inverse Measurement Models: Beam range-bearing sensor models, free space ray-casting, and occupied cell probability updates.
-  - Efficient grid update pipelines and handling sensor noise/uncertainty.
 - **Practice (1 Hour):**
   - Implementation of a 2D Log-Odds Occupancy Grid mapping pipeline in Python.
   - Processing simulated 2D LiDAR range and bearing point clouds using **Polars**.
-  - Interactive heat-map visualization of probability grids using **Plotly**.
+  - Computing an inflated safety **Costmap** using `scipy.ndimage.distance_transform_edt`.
+  - Dual-panel interactive heatmap visualization (Probability Grid + Safety Costmap) using **Plotly**.
 
 ---
 

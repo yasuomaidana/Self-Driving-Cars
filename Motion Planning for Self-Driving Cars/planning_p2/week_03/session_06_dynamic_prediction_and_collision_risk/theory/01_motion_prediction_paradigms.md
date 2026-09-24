@@ -4,15 +4,21 @@
 
 To safely plan motion around other traffic participants (vehicles, cyclists, pedestrians), autonomous vehicles forecast future trajectory distributions $\mathcal{P}(\mathbf{x}_{1:T}^{obs} \mid \mathbf{x}_{0}^{obs}, \text{Map})$:
 
-```
-┌─────────────────────────┬─────────────────────────┬─────────────────────────┐
-│     Physics-Based       │     Maneuver-Based      │   Interaction-Aware     │
-│ (Short horizon < 1-2s)  │ (Medium horizon 2-5s)   │ (Long horizon > 5s)     │
-├─────────────────────────┼─────────────────────────┼─────────────────────────┤
-│ • Constant Velocity(CV) │ • Lane Following        │ • Game Theory           │
-│ • Const. Accel (CA)     │ • Lane Change Left/Right│ • Multi-Agent Attention │
-│ • Const. Turn Rate(CTRV)│ • Intersection Turning  │ • Yielding / Courtesies │
-└─────────────────────────┴─────────────────────────┴─────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph PredModels["Motion Prediction Paradigms"]
+        direction LR
+        P1["<b>Physics-Based</b><br/><i>Short horizon (< 1-2s)</i><br/>• Constant Velocity (CV)<br/>• Constant Acceleration (CA)<br/>• Constant Turn Rate (CTRV)"]
+        P2["<b>Maneuver-Based</b><br/><i>Medium horizon (2-5s)</i><br/>• Lane Following<br/>• Lane Change Left/Right<br/>• Intersection Turning"]
+        P3["<b>Interaction-Aware</b><br/><i>Long horizon (> 5s)</i><br/>• Game Theory Models<br/>• Multi-Agent Attention<br/>• Yielding & Courtesies"]
+    end
+    
+    classDef p1 fill:#e1f5fe,stroke:#0288d1,stroke-width:1.5px;
+    classDef p2 fill:#fff3e0,stroke:#f57c00,stroke-width:1.5px;
+    classDef p3 fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1.5px;
+    class P1 p1;
+    class P2 p2;
+    class P3 p3;
 ```
 
 ---

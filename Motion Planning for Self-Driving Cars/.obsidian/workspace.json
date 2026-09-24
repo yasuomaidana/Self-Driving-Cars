@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "The Planning Problem/Objective Functions for Autonomous Driving.md",
+                "file": "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/theory/03_occupancy_grids_and_log_odds.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Objective Functions for Autonomous Driving"
+              "title": "03_occupancy_grids_and_log_odds"
             }
           },
           {
@@ -112,7 +112,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 500.1640625
   },
   "right": {
     "id": "e2823a2e11e7a45d",
@@ -219,6 +219,21 @@
   },
   "active": "b1c523cd67d511cb",
   "lastOpenFiles": [
+    "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/theory/02_lidar_preprocessing_and_filtering.md",
+    "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/theory/06_frenet_coordinate_frames.md",
+    "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/theory/04_lidar_inverse_sensor_model.md",
+    "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/theory/03_occupancy_grids_and_log_odds.md",
+    "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/practice/map_evolution.mp4",
+    "planning_p2/occupancy_and_costmap_solution.html",
+    "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/practice/map_evolution.gif",
+    "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/practice/map_evolution_interactive.html",
+    "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/practice/generate_map_evolution_video.py",
+    "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/theory/01_hd_maps_and_lanelets.md",
+    "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/README.md",
+    "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/theory/05_costmaps_and_obstacle_inflation.md",
+    "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/practice/occupancy_and_costmap_solution.html",
+    "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/theory/02_occupancy_grids_and_log_odds.md",
+    "The Planning Problem/Objective Functions for Autonomous Driving.md",
     "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/theory/04_velocity_profiling_and_optimization_instructor_guide.md",
     "UV_LAB_GUIDE.md",
     "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/practice/solution_velocity_profile_optimization.ipynb~",
@@ -226,15 +241,9 @@
     "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/kinematic_bicycle_solution.html",
     "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/practice/solution_kinematic_bicycle.ipynb",
     "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/practice/build_bicycle_notebooks.py",
-    "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/practice/build_frenet_notebooks.py",
-    "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/practice/__pycache__/solution_frenet_trajectory_optimization.cpython-314.pyc",
     "planning_p2/week_01/session_02_environmental_mapping_and_occupancy_grids/theory/04_frenet_coordinate_frames.md",
-    "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/practice/solution_frenet_trajectory_optimization.ipynb~",
-    "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/practice/exercise_frenet_trajectory_optimization.ipynb",
-    "planning_p2/week_01/session_01_introduction_and_kinematic_constraints/practice/solution_frenet_trajectory_optimization.ipynb",
     "The Planning Problem/Motion Planning Constraints.md",
     "The Planning Problem/Hierarchical Motion Planning.md",
-    "The Planning Problem/Objective Functions for Autonomous Driving.md",
     "The Planning Problem/Driving Missions, Scenarios, and Behaviour.md",
     "The Planning Problem/Reinforcement Learning model.jpg",
     "The Planning Problem/Rule Based.png",

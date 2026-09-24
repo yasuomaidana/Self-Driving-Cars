@@ -9,9 +9,18 @@ When a laser beam with measured range $r_k$ passes through space:
 2. **Occupied Surface Region ($r_k - \frac{\alpha}{2} \le r \le r_k + \frac{\alpha}{2}$):** The beam reflected off an object of thickness $\alpha$.
 3. **Occluded / Unobserved Region ($r > r_k + \frac{\alpha}{2}$):** The laser beam was blocked; no information is available.
 
-```
-Vehicle (0,0)  ══════ [Free Space: l_free] ══════> [Hit: l_occ] | (Occluded: no update)
-              r = 0                              r = r_k
+```mermaid
+flowchart LR
+    Pose["Vehicle Sensor Origin<br/>(r = 0)"] -->|Raycast Traversal| Free["Free Space Update Zone<br/>(r < r_k - α/2)<br/><b>Δl = l_free (< 0)</b>"]
+    Free -->|Obstacle Surface| Occ["Occupied Hit Zone<br/>(|r - r_k| ≤ α/2)<br/><b>Δl = l_occ (> 0)</b>"]
+    Occ -->|Shadow / Occlusion| Occluded["Occluded / Unobserved<br/>(r > r_k + α/2)<br/><b>Δl = 0 (No update)</b>"]
+    
+    classDef free fill:#e8f5e9,stroke:#388e3c,stroke-width:1.5px;
+    classDef occ fill:#ffebee,stroke:#d32f2f,stroke-width:1.5px;
+    classDef occl fill:#f5f5f5,stroke:#9e9e9e,stroke-width:1.5px,stroke-dasharray: 5 5;
+    class Free free;
+    class Occ occ;
+    class Occluded occl;
 ```
 
 ---

@@ -10,17 +10,27 @@ In global Cartesian space $(x, y, \theta)$, driving tasks like lane-keeping, lan
 
 To overcome this, autonomous vehicle motion planners transform state representations into a **road-aligned curvilinear coordinate frame**, universally known as the **Frenet-Serret Frame** (or simply **Frenet Frame**).
 
-```
-   Cartesian Frame (Global x, y)                 Frenet Frame (Road-Aligned s, d)
-   
-        y ^                                            d ^ (Cross-track offset)
-          |        .-'""'-.                              |      +d (Left)
-          |      .'        '.                            |  -------------  Lane Boundary (+1.75m)
-          |     /    🚗 (x,y) \                          |  . - - - - - -  Reference Centerline (d=0)
-          |    |               |                         |  -------------  Lane Boundary (-1.75m)
-          |     \             /                          |      -d (Right)
-          +---------------------->                       +------------------------->
-                                 x                                                 s (Longitudinal progress)
+```mermaid
+flowchart LR
+    subgraph CartesianSpace["Global Cartesian Space (x, y)"]
+        direction TB
+        C_Note["• Non-linear curved road geometry<br/>• Highly coupled dynamics in x and y<br/>• Non-linear corridor boundaries g(x,y) ≤ 0"]
+        C_Car["🚗 Vehicle State: (x, y, θ)"]
+    end
+
+    subgraph FrenetSpace["Road-Aligned Frenet Space (s, d)"]
+        direction TB
+        F_Long["<b>Longitudinal Axis (s):</b> Along-track arc length progress"]
+        F_Lat["<b>Lateral Axis (d):</b> Cross-track signed offset from centerline"]
+        F_Bounds["<b>Trivial Linear Corridor:</b> -1.75m ≤ d ≤ +1.75m"]
+    end
+
+    CartesianSpace ==>|Frenet Transformation| FrenetSpace
+    
+    classDef cart fill:#fff3e0,stroke:#f57c00,stroke-width:1.5px;
+    classDef fren fill:#e8f5e9,stroke:#388e3c,stroke-width:1.5px;
+    class CartesianSpace cart;
+    class FrenetSpace fren;
 ```
 
 ---
@@ -92,21 +102,16 @@ Given an arbitrary vehicle pose $\mathbf{p} = [x, y]^T$ in global coordinates:
 
 By transforming the planning problem into the Frenet frame, a complex 2D non-linear optimization problem decomposes into two independent, intuitive 1D planning problems:
 
-```
-                          ┌───────────────────────────────┐
-                          │   Autonomous Driving Goal    │
-                          └──────────────┬────────────────┘
-                                         │
-                 ┌───────────────────────┴───────────────────────┐
-                 ▼                                               ▼
-   ┌───────────────────────────┐                   ┌───────────────────────────┐
-   │  Longitudinal Plan: s(t)  │                   │   Lateral Plan: d(s) / d(t) │
-   ├───────────────────────────┤                   ├───────────────────────────┤
-   │ • Target cruise speed     │                   │ • Lane-keeping (d = 0)    │
-   │ • Car-following distance  │                   │ • Lane change (d -> d±W)  │
-   │ • Stop line deceleration  │                   │ • Nudge static obstacles  │
-   │ • Traffic light stops     │                   │ • Stay within boundaries  │
-   └───────────────────────────┘                   └───────────────────────────┘
+```mermaid
+flowchart TD
+    Goal["<b>Autonomous Driving Goal</b>"]
+    Goal --> Long["<b>Longitudinal Plan: s(t)</b><br/>• Target cruise speed<br/>• Lead vehicle following<br/>• Stop line deceleration<br/>• Traffic light stop"]
+    Goal --> Lat["<b>Lateral Plan: d(s) / d(t)</b><br/>• Lane-keeping (d = 0)<br/>• Lane change (d ──▶ d ± W)<br/>• Nudge static obstacles<br/>• Stay within boundaries"]
+    
+    classDef main fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+    classDef plan fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1.5px;
+    class Goal main;
+    class Long,Lat plan;
 ```
 
 ### Key Advantages in Motion Planning:
