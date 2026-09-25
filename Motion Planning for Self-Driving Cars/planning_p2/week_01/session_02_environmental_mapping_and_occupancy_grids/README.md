@@ -25,7 +25,7 @@ By the end of this session, students will be able to:
 - [01. HD Maps, Lanelet2 & Road Network Representations](theory/01_hd_maps_and_lanelets.md): Vector road representation, regulatory elements, and lane connectivity graphs.
 - [02. LiDAR Point Cloud Preprocessing & Filtering](theory/02_lidar_preprocessing_and_filtering.md): Voxel downsampling, RANSAC ground removal, ceiling cropping, and dynamic vehicle filtering.
 - [03. Occupancy Grids & Log-Odds Formulation](theory/03_occupancy_grids_and_log_odds.md): Mathematical derivation of the binary Bayes filter, Log-odds ratio, and recursive cell probability updates.
-- [04. LiDAR Inverse Sensor Model](theory/04_lidar_inverse_sensor_model.md): Beam sensor geometry, free-space dilation, and ray casting.
+- [04. LiDAR Inverse Sensor Model (2D & 3D)](theory/04_lidar_inverse_sensor_model.md): 2D polar & 3D spherical beam geometry, volumetric voxel log-odds, and 3D Amanatides-Woo ray traversal.
 - [05. Costmaps, Inflation Layers & Drivability Grids](theory/05_costmaps_and_obstacle_inflation.md): Converting probability grids into inflated obstacle costmaps via Distance Transforms.
 - [06. Frenet Coordinate Frames](theory/06_frenet_coordinate_frames.md): Road-aligned curvilinear coordinates $(s, d)$, Cartesian $\leftrightarrow$ Frenet transformations, and longitudinal/lateral decoupling.
 
