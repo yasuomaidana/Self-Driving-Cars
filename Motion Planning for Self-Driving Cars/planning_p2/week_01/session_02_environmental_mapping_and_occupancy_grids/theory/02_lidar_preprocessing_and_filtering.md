@@ -81,8 +81,8 @@ Occupancy grids assume the environment is **strictly static**. If a moving car o
 
 ---
 
-## 5. 2D Range-Bearing Projection
+## 5. Mapping Destination: 2D Projection vs. 3D Voxel Integration
 
-Once the filtered, static non-ground point cloud $\mathcal{P}_{\text{clean}} = \{ (x_i, y_i, z_i) \}$ is obtained:
-- For 2D grid planning, points are projected onto the horizontal plane by dropping $z_i$.
-- Points are converted into sensor-centric polar coordinates (range $r_i$ and azimuth $\phi_i$) to serve as clean inputs for the **Inverse Measurement Model**.
+Once the filtered, static non-ground point cloud $\mathcal{P}_{\text{clean}} = \{ (x_i, y_i, z_i) \}$ is obtained, it is routed based on the grid dimensionality:
+* **For 2D Occupancy Grids:** Points within the vehicle height window are projected onto the horizontal $(x, y)$ plane by dropping $z_i$, and converted into sensor-centric polar coordinates (range $r_i$ and azimuth $\phi_i$) for 2D ray casting and inverse sensor model updates.
+* **For 3D Occupancy Grids (Voxel Grids / OctoMaps):** The full 3D coordinates $(x_i, y_i, z_i)$ and 3D ray trajectories from the sensor origin are preserved for volumetric voxel updates (e.g. 3D Bresenham ray traversal).

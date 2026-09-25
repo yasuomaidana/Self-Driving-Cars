@@ -1,13 +1,28 @@
 # Occupancy Grids & The Log-Odds Formulation
 
-## 1. 2D Occupancy Grid Mapping
+## 1. Occupancy Grid Representations: 2D vs. 3D
 
-An **Occupancy Grid Map** discretizes the continuous continuous 2D Cartesian world into a tessellated grid of cells:
+An **Occupancy Grid Map** discretizes continuous Cartesian space into a tessellated grid of discrete cells or volumetric elements:
 $$\mathbf{m} = \{m_i\}, \quad i \in \{1, 2, \dots, N\}$$
 
-Each grid cell $m_i$ represents a small square area (e.g. $0.1\,\text{m} \times 0.1\,\text{m}$ or $0.2\,\text{m} \times 0.2\,\text{m}$) with a binary state:
+Depending on the operational design domain (ODD) and computational budget, occupancy grids are implemented in either **2D** or **3D**:
+
+### A. 2D Occupancy Grids (Planar)
+* **Geometry:** Discretizes the 2D ground plane $(x, y)$ into square pixels (e.g., $0.1\,\text{m} \times 0.1\,\text{m}$ or $0.2\,\text{m} \times 0.2\,\text{m}$).
+* **Usage:** Standard on-road autonomous driving where vertical height differences can be simplified after ground removal and height clipping.
+* **Pros:** Highly computationally efficient, low memory footprint ($O(N^2)$), and enables fast 2D convolution/distance transforms for costmaps.
+* **Cons:** Cannot represent multi-level structures (e.g., multi-story parking garages, driving under overpasses/bridges, tunnels).
+
+### B. 3D Occupancy Grids (Volumetric Voxels & OctoMaps)
+* **Geometry:** Discretizes 3D space $(x, y, z)$ into cubic voxels (e.g., $0.1\,\text{m} \times 0.1\,\text{m} \times 0.1\,\text{m}$), often managed hierarchically using **Octrees** (such as *OctoMap*) or GPU-accelerated sparse voxel hash tables.
+* **Usage:** Drones/UAVs, off-road autonomous vehicles, warehouse robots with vertical manipulators, and complex multi-level urban environments.
+* **Pros:** Fully captures 3D overhangs, bridges, tunnels, tree canopies, and sloping terrain.
+* **Cons:** High memory consumption ($O(N^3)$ dense), higher ray-casting complexity ($O(N^3)$ 3D Bresenham/voxel traversal), and slower inflation.
+
+### Cell State Definition:
+Each cell or voxel $m_i$ maintains a binary state:
 - $m_i = 1$: Cell is occupied by an obstacle.
-- $m_i = 0$: Cell is free drivable space.
+- $m_i = 0$: Cell is free drivable/navigable space.
 
 ### Core Assumptions:
 1. **Static Environment:** The physical obstacle map does not change during the update step (dynamic obstacles are filtered out beforehand).
