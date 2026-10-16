@@ -4,19 +4,23 @@
 
 In realistic road networks, the cost of entering an edge $(v_j, v_k)$ depends on which edge $(v_i, v_j)$ the vehicle arrived from.
 
-```
-                  Node 3 (Straight)
-                      ^
-                      |
-Node 1 (Origin) ---> Node 2 (Intersection) ---> Node 4 (Right Turn: Easy)
-                      |
-                      v
-                  Node 5 (Left Turn: Yield to oncoming traffic)
+```mermaid
+flowchart TD
+    N1["Node 1 (Origin)"] -->|"Approach Edge"| N2["Node 2 (Intersection)"]
+    N2 -->|"Straight (+0s)"| N3["Node 3 (North)"]
+    N2 -->|"Right Turn: Low conflict (+2s)"| N4["Node 4 (East)"]
+    N2 -->|"Left Turn: Yield to traffic (+10s)"| N5["Node 5 (South)"]
+    N2 -.->|"U-Turn: Prohibited / Extreme Penalty (+30s)"| N1
+
+    style N2 fill:#fef08a,stroke:#ca8a04,stroke-width:2px
+    style N4 fill:#dcfce7,stroke:#22c55e,stroke-width:2px
+    style N5 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
 ```
 
 1. **Right Turns:** Minimal conflict with oncoming traffic; low delay penalty ($+2s$).
 2. **Left Turns (Unprotected):** High risk, yielding required; substantial delay penalty ($+8s \sim +15s$).
-3. **U-Turns:** Heavy penalty or legally prohibited.
+3. **U-Turns:** Heavy penalty or legally prohibited ($+30s$).
+
 
 ---
 

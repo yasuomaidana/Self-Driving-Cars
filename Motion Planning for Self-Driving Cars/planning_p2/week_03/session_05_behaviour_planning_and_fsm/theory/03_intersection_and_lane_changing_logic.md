@@ -3,24 +3,21 @@
 ## 1. Stop-Sign Intersection Negotiation Protocol
 
 At an all-way stop sign intersection, the autonomous vehicle must follow deterministic safety rules:
-
-```
 1. Approach & Decelerate:
    - Identify stop line s_stop.
    - Smoothly decelerate: a_req = - v^2 / (2 * (s_stop - s_curr)).
    
 2. Full Stop & Timer:
    - Transition to STAY_STOPPED when |v| < 0.1 m/s and dist_to_stop_line < 1.0 m.
-   - Start 3.0-second countdown timer.
+   - Start a 3.0-second countdown timer.
 
 3. Yield / Right-of-Way Evaluation:
    - Check dynamic objects: Detect vehicles that arrived at earlier timestamps.
    - Verify intersection conflict zones are clear of oncoming traffic and pedestrians.
 
 4. Proceed & Cross:
-   - Accelerate smoothly through intersection along reference turn centerline.
+   - Accelerate smoothly through the intersection along the reference turn centerline.
    - Transition back to LANE_FOLLOW once vehicle rear axle clears intersection exit.
-```
 
 ---
 

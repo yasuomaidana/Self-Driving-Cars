@@ -15,35 +15,75 @@ Where:
 
 ## 2. A* Search Mechanics
 
+```mermaid
+flowchart TD
+    Start(["Start Search: push (f(start), start) to Priority Queue"]) --> Pop["Pop node u with lowest f(u) = g(u) + h(u)"]
+    Pop --> CheckGoal{"Is u == goal?"}
+    CheckGoal -- Yes --> Reconstruct(["Reconstruct & Return Optimal Path"])
+    CheckGoal -- No --> CheckVisited{"Is u already visited?"}
+    CheckVisited -- Yes --> Pop
+    CheckVisited -- No --> MarkVisited["Add u to visited set"]
+    MarkVisited --> Expand["For each neighbor v in neighbors(u)"]
+    Expand --> Relax{"tentative_g < g_score[v]?"}
+    Relax -- Yes --> Update["Update g_score[v] = tentative_g<br/>parent[v] = u<br/>Push (g[v] + h(v, goal), v) to Priority Queue"]
+    Relax -- No --> NextNeighbor{"More neighbors?"}
+    Update --> NextNeighbor
+    NextNeighbor -- Yes --> Expand
+    NextNeighbor -- No --> QueueEmpty{"Is Priority Queue empty?"}
+    QueueEmpty -- No --> Pop
+    QueueEmpty -- Yes --> Fail(["No Path Found"])
+```
+
+
 ```python
-def a_star(Graph G, Node start, Node goal, Heuristic h):
-    g_score = {node: infinity for node in G.nodes}
-    g_score[start] = 0
-    f_score = {node: infinity for node in G.nodes}
-    f_score[start] = h(start, goal)
+def a_star(graph, source, target, heuristic):
+    # 1. Initialize data structures
+    open_set = MinPriorityQueue()          # Min-heap automatically sorts lowest f(n) to front
+    g_score = {node: float('inf') for node in graph.nodes}
+    g_score[source] = 0.0
+    prev = {node: None for node in graph.nodes}
+    visited = set()                        # Closed set to avoid reprocessing expanded nodes
     
-    parent = {node: None for node in G.nodes}
-    frontier = PriorityQueue() # ordered by f_score
-    frontier.push((f_score[start], start))
-    visited = set()
+    # Seed priority queue with starting node: f(source) = g(source) + h(source, target) = h(source, target)
+    open_set.push(source, priority=heuristic(source, target))
     
-    while not frontier.is_empty():
-        current_f, u = frontier.pop_min()
+    # 2. Main exploration loop
+    while not open_set.is_empty():
+        u = open_set.extract_min()         # O(log V) extraction of node with lowest f(n)
         
-        if u == goal:
-            return reconstruct_path(parent, goal)
+        # Optimality guaranteed: goal reached upon extraction from open_set
+        if u == target:
+            return reconstruct_path(prev, u), g_score[u]
             
+        # Duplicate entry check for min-heaps
         if u in visited:
             continue
         visited.add(u)
         
-        for neighbor, edge_weight in G.neighbors(u):
+        # 3. Relax outgoing neighbors
+        for v in graph.neighbors(u):
+            edge_weight = graph.distance(u, v)
             tentative_g = g_score[u] + edge_weight
-            if tentative_g < g_score[neighbor]:
-                g_score[neighbor] = tentative_g
-                f_score[neighbor] = tentative_g + h(neighbor, goal)
-                parent[neighbor] = u
-                frontier.push((f_score[neighbor], neighbor))
+            
+            # Discovered a strictly shorter path to neighbor v
+            if tentative_g < g_score[v]:
+                prev[v] = u
+                g_score[v] = tentative_g
+                f_score_v = tentative_g + heuristic(v, target)  # Total estimated path cost f(v) = g(v) + h(v)
+                open_set.push(v, priority=f_score_v)
                 
-    return None
+    return None, float('inf')              # Target unreachable
 ```
+
+---
+
+## 3. Advanced Informed Search Extensions
+
+1. **Weighted A\* ($w > 1.0$):**
+   $$f(n) = g(n) + w \cdot h(n)$$
+   - Trades bounded $\epsilon$-suboptimality ($\text{Cost} \le w \cdot \text{Cost}^*$) for accelerated goal-directed convergence.
+
+2. **Bidirectional A\*:**
+   - Runs simultaneous forward search ($s \to t$) and backward search ($t \to s$), reducing search area from $\mathcal{O}(b^d)$ to $\mathcal{O}(2 \cdot b^{d/2})$.
+   - See [04. Bidirectional A* Search](04_bidirectional_astar_search.md) for full mathematical formulation, directed graph traversal, and safe meeting termination criteria.
+
